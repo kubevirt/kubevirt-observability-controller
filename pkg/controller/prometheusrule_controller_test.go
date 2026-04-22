@@ -12,10 +12,9 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
+	k6tv1 "kubevirt.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
-
-	"github.com/kubevirt/observability-operator/pkg/monitoring/rules"
 )
 
 func TestController(t *testing.T) {
@@ -29,25 +28,31 @@ func init() {
 	testScheme = runtime.NewScheme()
 	_ = clientgoscheme.AddToScheme(testScheme)
 	_ = monitoringv1.AddToScheme(testScheme)
+	_ = k6tv1.AddToScheme(testScheme)
+}
+
+func newKubeVirt(namespace string) *k6tv1.KubeVirt {
+	return &k6tv1.KubeVirt{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "kubevirt",
+			Namespace: namespace,
+		},
+	}
 }
 
 var _ = Describe("PrometheusRule Reconciler", func() {
-	BeforeEach(func() {
-		_ = rules.SetupRules("kubevirt")
-	})
-
 	It("should create PrometheusRule when it does not exist", func() {
 		ctx := context.Background()
 
 		fakeClient := fake.NewClientBuilder().
 			WithScheme(testScheme).
+			WithObjects(newKubeVirt("kubevirt")).
 			Build()
 
 		reconciler := &PrometheusRuleReconciler{
-			Client:    fakeClient,
-			Scheme:    testScheme,
-			Version:   "0.0.1",
-			Namespace: "kubevirt",
+			Client:  fakeClient,
+			Scheme:  testScheme,
+			Version: "0.0.1",
 		}
 
 		result, err := reconciler.Reconcile(ctx, reconcile.Request{})
@@ -77,14 +82,13 @@ var _ = Describe("PrometheusRule Reconciler", func() {
 
 		fakeClient := fake.NewClientBuilder().
 			WithScheme(testScheme).
-			WithObjects(stale).
+			WithObjects(newKubeVirt("kubevirt"), stale).
 			Build()
 
 		reconciler := &PrometheusRuleReconciler{
-			Client:    fakeClient,
-			Scheme:    testScheme,
-			Version:   "0.0.1",
-			Namespace: "kubevirt",
+			Client:  fakeClient,
+			Scheme:  testScheme,
+			Version: "0.0.1",
 		}
 
 		_, err := reconciler.Reconcile(ctx, reconcile.Request{})
@@ -104,17 +108,35 @@ var _ = Describe("PrometheusRule Reconciler", func() {
 
 		fakeClient := fake.NewClientBuilder().
 			WithScheme(testScheme).
+			WithObjects(newKubeVirt("kubevirt")).
 			Build()
 
 		reconciler := &PrometheusRuleReconciler{
-			Client:    fakeClient,
-			Scheme:    testScheme,
-			Version:   "0.0.1",
-			Namespace: "kubevirt",
+			Client:  fakeClient,
+			Scheme:  testScheme,
+			Version: "0.0.1",
 		}
 
 		_, err := reconciler.Reconcile(ctx, reconcile.Request{})
 		Expect(err).ToNot(HaveOccurred())
+
+		result, err := reconciler.Reconcile(ctx, reconcile.Request{})
+		Expect(err).ToNot(HaveOccurred())
+		Expect(result).To(Equal(reconcile.Result{}))
+	})
+
+	It("should skip reconciliation when no KubeVirt CR exists", func() {
+		ctx := context.Background()
+
+		fakeClient := fake.NewClientBuilder().
+			WithScheme(testScheme).
+			Build()
+
+		reconciler := &PrometheusRuleReconciler{
+			Client:  fakeClient,
+			Scheme:  testScheme,
+			Version: "0.0.1",
+		}
 
 		result, err := reconciler.Reconcile(ctx, reconcile.Request{})
 		Expect(err).ToNot(HaveOccurred())

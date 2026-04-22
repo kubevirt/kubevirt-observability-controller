@@ -30,10 +30,11 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
+	k6tv1 "kubevirt.io/api/core/v1"
+	instancetypev1beta1 "kubevirt.io/api/instancetype/v1beta1"
 	ctrl "sigs.k8s.io/controller-runtime"
 
 	"github.com/kubevirt/observability-operator/pkg/controller"
-	"github.com/kubevirt/observability-operator/pkg/monitoring/rules"
 	"sigs.k8s.io/controller-runtime/pkg/certwatcher"
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
@@ -51,6 +52,8 @@ var (
 func init() {
 	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
 	utilruntime.Must(monitoringv1.AddToScheme(scheme))
+	utilruntime.Must(k6tv1.AddToScheme(scheme))
+	utilruntime.Must(instancetypev1beta1.AddToScheme(scheme))
 
 	// +kubebuilder:scaffold:scheme
 }
@@ -203,16 +206,10 @@ func main() {
 		os.Exit(1)
 	}
 
-	if err := rules.SetupRules("kubevirt"); err != nil {
-		setupLog.Error(err, "unable to set up rules")
-		os.Exit(1)
-	}
-
 	if err := (&controller.PrometheusRuleReconciler{
-		Client:    mgr.GetClient(),
-		Scheme:    mgr.GetScheme(),
-		Version:   "0.0.1",
-		Namespace: "kubevirt",
+		Client:  mgr.GetClient(),
+		Scheme:  mgr.GetScheme(),
+		Version: "0.0.1",
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "PrometheusRule")
 		os.Exit(1)
