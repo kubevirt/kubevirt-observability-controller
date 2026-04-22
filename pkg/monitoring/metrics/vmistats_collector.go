@@ -109,11 +109,12 @@ var (
 )
 
 func vmiStatsCollectorCallback() []operatormetrics.CollectorResult {
-	if stores == nil || stores.VMI == nil {
+	s := getStores()
+	if s == nil || s.VMI == nil {
 		return []operatormetrics.CollectorResult{}
 	}
 
-	cachedObjs := stores.VMI.List()
+	cachedObjs := s.VMI.List()
 	if len(cachedObjs) == 0 {
 		return []operatormetrics.CollectorResult{}
 	}
@@ -191,11 +192,12 @@ func getVMIMachine(vmi *k6tv1.VirtualMachineInstance) string {
 }
 
 func getVMIPod(vmi *k6tv1.VirtualMachineInstance) string {
-	if indexers == nil || indexers.KVPod == nil {
+	idx := getIndexers()
+	if idx == nil || idx.KVPod == nil {
 		return None
 	}
 
-	objs, err := indexers.KVPod.ByIndex(
+	objs, err := idx.KVPod.ByIndex(
 		cache.NamespaceIndex, vmi.Namespace,
 	)
 	if err != nil {
@@ -219,30 +221,32 @@ func getVMIPod(vmi *k6tv1.VirtualMachineInstance) string {
 }
 
 func getVMIInstancetype(vmi *k6tv1.VirtualMachineInstance) string {
+	s := getStores()
 	if name, ok := vmi.Annotations[k6tv1.InstancetypeAnnotation]; ok {
 		key := types.NamespacedName{
 			Namespace: vmi.Namespace, Name: name,
 		}
-		return FetchResourceName(key.String(), stores.Instancetype)
+		return FetchResourceName(key.String(), s.Instancetype)
 	}
 
 	if name, ok := vmi.Annotations[k6tv1.ClusterInstancetypeAnnotation]; ok {
-		return FetchResourceName(name, stores.ClusterInstancetype)
+		return FetchResourceName(name, s.ClusterInstancetype)
 	}
 
 	return None
 }
 
 func getVMIPreference(vmi *k6tv1.VirtualMachineInstance) string {
+	s := getStores()
 	if name, ok := vmi.Annotations[k6tv1.PreferenceAnnotation]; ok {
 		key := types.NamespacedName{
 			Namespace: vmi.Namespace, Name: name,
 		}
-		return FetchResourceName(key.String(), stores.Preference)
+		return FetchResourceName(key.String(), s.Preference)
 	}
 
 	if name, ok := vmi.Annotations[k6tv1.ClusterPreferenceAnnotation]; ok {
-		return FetchResourceName(name, stores.ClusterPreference)
+		return FetchResourceName(name, s.ClusterPreference)
 	}
 
 	return None
@@ -343,11 +347,12 @@ func CollectVMIMigrationTime(
 }
 
 func getMigrationNameFromUID(migrationUID types.UID) string {
-	if indexers == nil || indexers.VMIMigration == nil {
+	idx := getIndexers()
+	if idx == nil || idx.VMIMigration == nil {
 		return None
 	}
 
-	objs, err := indexers.VMIMigration.ByIndex(
+	objs, err := idx.VMIMigration.ByIndex(
 		ByMigrationUIDIndex, string(migrationUID),
 	)
 	if err != nil || len(objs) == 0 {

@@ -64,11 +64,12 @@ var (
 )
 
 func migrationStatsCollectorCallback() []operatormetrics.CollectorResult {
-	if indexers == nil || indexers.VMIMigration == nil {
+	idx := getIndexers()
+	if idx == nil || idx.VMIMigration == nil {
 		return []operatormetrics.CollectorResult{}
 	}
 
-	cachedObjs := indexers.VMIMigration.List()
+	cachedObjs := idx.VMIMigration.List()
 	vmims := make([]*k6tv1.VirtualMachineInstanceMigration, len(cachedObjs))
 	for i, obj := range cachedObjs {
 		vmims[i] = obj.(*k6tv1.VirtualMachineInstanceMigration)

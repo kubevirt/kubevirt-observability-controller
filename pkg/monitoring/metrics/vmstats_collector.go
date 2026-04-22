@@ -138,11 +138,12 @@ var (
 )
 
 func vmStatsCollectorCallback() []operatormetrics.CollectorResult {
-	if stores == nil || stores.VM == nil {
+	s := getStores()
+	if s == nil || s.VM == nil {
 		return []operatormetrics.CollectorResult{}
 	}
 
-	cachedObjs := stores.VM.List()
+	cachedObjs := s.VM.List()
 	if len(cachedObjs) == 0 {
 		return []operatormetrics.CollectorResult{}
 	}
@@ -201,13 +202,14 @@ func getVMInstancetype(vm *k6tv1.VirtualMachine) string {
 		return None
 	}
 
+	s := getStores()
 	if strings.EqualFold(it.Kind, instancetypeapi.SingularResourceName) {
 		key := types.NamespacedName{Namespace: vm.Namespace, Name: it.Name}
-		return FetchResourceName(key.String(), stores.Instancetype)
+		return FetchResourceName(key.String(), s.Instancetype)
 	}
 
 	if strings.EqualFold(it.Kind, instancetypeapi.ClusterSingularResourceName) {
-		return FetchResourceName(it.Name, stores.ClusterInstancetype)
+		return FetchResourceName(it.Name, s.ClusterInstancetype)
 	}
 
 	return None
@@ -219,15 +221,16 @@ func getVMPreference(vm *k6tv1.VirtualMachine) string {
 		return None
 	}
 
+	s := getStores()
 	if strings.EqualFold(pref.Kind, instancetypeapi.SingularPreferenceResourceName) {
 		key := types.NamespacedName{Namespace: vm.Namespace, Name: pref.Name}
-		return FetchResourceName(key.String(), stores.Preference)
+		return FetchResourceName(key.String(), s.Preference)
 	}
 
 	if strings.EqualFold(
 		pref.Kind, instancetypeapi.ClusterSingularPreferenceResourceName,
 	) {
-		return FetchResourceName(pref.Name, stores.ClusterPreference)
+		return FetchResourceName(pref.Name, s.ClusterPreference)
 	}
 
 	return None
@@ -554,7 +557,8 @@ func CollectDiskAllocatedSize(
 func collectDiskMetricsFromPVC(
 	vm *k6tv1.VirtualMachine,
 ) []operatormetrics.CollectorResult {
-	if stores == nil || stores.PVC == nil {
+	s := getStores()
+	if s == nil || s.PVC == nil {
 		return nil
 	}
 
@@ -568,7 +572,7 @@ func collectDiskMetricsFromPVC(
 		}
 
 		key := NamespacedKey(vm.Namespace, pvcName)
-		obj, exists, err := stores.PVC.GetByKey(key)
+		obj, exists, err := s.PVC.GetByKey(key)
 		if err != nil || !exists {
 			continue
 		}

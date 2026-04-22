@@ -14,7 +14,7 @@ import (
 var _ = Describe("VMI Stats Collector", func() {
 	Describe("CollectVMIInfo", func() {
 		It("should collect VMI info with phase and annotations", func() {
-			stores = &Stores{}
+			storesRef.Store(&Stores{})
 			vmi := &k6tv1.VirtualMachineInstance{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "test-vmi",
@@ -41,7 +41,7 @@ var _ = Describe("VMI Stats Collector", func() {
 		})
 
 		It("should include guest OS info", func() {
-			stores = &Stores{}
+			storesRef.Store(&Stores{})
 			vmi := &k6tv1.VirtualMachineInstance{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "vmi1", Namespace: "ns1",
@@ -65,7 +65,7 @@ var _ = Describe("VMI Stats Collector", func() {
 		})
 
 		It("should report outdated when label is present", func() {
-			stores = &Stores{}
+			storesRef.Store(&Stores{})
 			vmi := &k6tv1.VirtualMachineInstance{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "vmi1",
