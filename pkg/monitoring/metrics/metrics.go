@@ -1,3 +1,6 @@
 package metrics
 
-var indexers *Indexers
+var (
+	stores   *Stores
+	indexers *Indexers
+)
