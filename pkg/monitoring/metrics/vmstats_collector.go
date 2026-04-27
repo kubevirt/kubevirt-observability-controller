@@ -1,6 +1,8 @@
 package metrics
 
 import (
+	"maps"
+	"slices"
 	"strings"
 
 	"github.com/rhobs/operator-observability-toolkit/pkg/operatormetrics"
@@ -153,14 +155,14 @@ func vmStatsCollectorCallback() []operatormetrics.CollectorResult {
 		vms[i] = obj.(*k6tv1.VirtualMachine)
 	}
 
-	var results []operatormetrics.CollectorResult
-	results = append(results, CollectDiskAllocatedSize(vms)...)
-	results = append(results, CollectVMsInfo(vms)...)
-	results = append(results, CollectResourceRequestsAndLimits(vms)...)
-	results = append(results, ReportVMStats(vms)...)
-	results = append(results, collectVMCreationTimestamp(vms)...)
-	results = append(results, CollectVmsVnicInfo(vms)...)
-	return results
+	return slices.Concat(
+		CollectDiskAllocatedSize(vms),
+		CollectVMsInfo(vms),
+		CollectResourceRequestsAndLimits(vms),
+		ReportVMStats(vms),
+		collectVMCreationTimestamp(vms),
+		CollectVmsVnicInfo(vms),
+	)
 }
 
 func CollectVMsInfo(vms []*k6tv1.VirtualMachine) []operatormetrics.CollectorResult {
@@ -239,19 +241,27 @@ func getVMPreference(vm *k6tv1.VirtualMachine) string {
 func CollectResourceRequestsAndLimits(
 	vms []*k6tv1.VirtualMachine,
 ) []operatormetrics.CollectorResult {
-	var results []operatormetrics.CollectorResult
+	results := make([]operatormetrics.CollectorResult, 0, len(vms))
 
 	for _, vm := range vms {
-		results = append(results, collectMemoryRequests(vm)...)
-		results = append(results, collectMemoryLimits(vm)...)
-		results = append(results, collectCPURequestsFromDomainCPU(vm)...)
-		results = append(results, collectCPURequestsFromResources(vm)...)
-		results = append(results, collectCPULimits(vm)...)
-		results = append(results, collectAllocatedCPU(vm)...)
-		results = append(results, collectAllocatedMemory(vm)...)
+		results = append(results, collectVMResourceRequestsAndLimits(vm)...)
 	}
 
 	return results
+}
+
+func collectVMResourceRequestsAndLimits(
+	vm *k6tv1.VirtualMachine,
+) []operatormetrics.CollectorResult {
+	return slices.Concat(
+		collectMemoryRequests(vm),
+		collectMemoryLimits(vm),
+		collectCPURequestsFromDomainCPU(vm),
+		collectCPURequestsFromResources(vm),
+		collectCPULimits(vm),
+		collectAllocatedCPU(vm),
+		collectAllocatedMemory(vm),
+	)
 }
 
 func collectMemoryRequests(vm *k6tv1.VirtualMachine) []operatormetrics.CollectorResult {
@@ -373,9 +383,8 @@ func collectCPURequestsFromDomainCPU(
 func collectCPURequestsFromResources(
 	vm *k6tv1.VirtualMachine,
 ) []operatormetrics.CollectorResult {
-	var cr []operatormetrics.CollectorResult
 	if vm.Spec.Template == nil {
-		return cr
+		return []operatormetrics.CollectorResult{}
 	}
 
 	cpuReq := vm.Spec.Template.Spec.Domain.Resources.Requests.Cpu()
@@ -402,15 +411,15 @@ func collectCPURequestsFromResources(
 				},
 			}
 		}
-		return cr
+
+		return []operatormetrics.CollectorResult{}
 	}
 
-	cr = append(cr, operatormetrics.CollectorResult{
+	return []operatormetrics.CollectorResult{{
 		Metric: vmResourceRequests,
 		Value:  float64(cpuReq.ScaledValue(resource.Milli)) / 1000,
 		Labels: []string{vm.Name, vm.Namespace, "cpu", "cores", "requests"},
-	})
-	return cr
+	}}
 }
 
 func collectCPULimits(
@@ -462,7 +471,7 @@ func collectAllocatedCPU(
 func ReportVMStats(
 	vms []*k6tv1.VirtualMachine,
 ) []operatormetrics.CollectorResult {
-	var cr []operatormetrics.CollectorResult
+	cr := make([]operatormetrics.CollectorResult, 0, len(vms)*(1+len(timestampMetrics)))
 	for _, vm := range vms {
 		cr = append(cr, ReportVMLabels(vm)...)
 		cr = append(cr, reportVMTimestamps(vm)...)
@@ -472,13 +481,9 @@ func ReportVMStats(
 
 func ReportVMLabels(vm *k6tv1.VirtualMachine) []operatormetrics.CollectorResult {
 	mergedLabels := make(map[string]string)
-	for key, value := range vm.Labels {
-		mergedLabels[key] = value
-	}
+	maps.Copy(mergedLabels, vm.Labels)
 	if vm.Spec.Template != nil {
-		for key, value := range vm.Spec.Template.ObjectMeta.Labels {
-			mergedLabels[key] = value
-		}
+		maps.Copy(mergedLabels, vm.Spec.Template.ObjectMeta.Labels)
 	}
 
 	if len(mergedLabels) == 0 {
