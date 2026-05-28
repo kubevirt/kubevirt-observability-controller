@@ -4,8 +4,8 @@ import (
 	promv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
 	"github.com/rhobs/operator-observability-toolkit/pkg/operatorrules"
 
-	"github.com/kubevirt/observability-operator/pkg/monitoring/rules/alerts"
-	"github.com/kubevirt/observability-operator/pkg/monitoring/rules/recordingrules"
+	"github.com/kubevirt/kubevirt-observability-controller/pkg/monitoring/rules/alerts"
+	"github.com/kubevirt/kubevirt-observability-controller/pkg/monitoring/rules/recordingrules"
 )
 
 var registry = operatorrules.NewRegistry()
@@ -23,7 +23,7 @@ func BuildPrometheusRule(name, namespace string) (*promv1.PrometheusRule, error)
 		name,
 		namespace,
 		map[string]string{
-			"app.kubernetes.io/managed-by": "observability-operator",
+			"app.kubernetes.io/managed-by": "kubevirt-observability-controller",
 		},
 	)
 }

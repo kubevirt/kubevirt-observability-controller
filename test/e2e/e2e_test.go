@@ -27,20 +27,20 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
-	"github.com/kubevirt/observability-operator/test/utils"
+	"github.com/kubevirt/kubevirt-observability-controller/test/utils"
 )
 
 // namespace where the project is deployed in
-const namespace = "observability-operator-system"
+const namespace = "kubevirt-observability-controller-system"
 
 // serviceAccountName created for the project
-const serviceAccountName = "observability-operator-controller-manager"
+const serviceAccountName = "kubevirt-observability-controller-controller-manager"
 
 // metricsServiceName is the name of the metrics service of the project
-const metricsServiceName = "observability-operator-controller-manager-metrics-service"
+const metricsServiceName = "kubevirt-observability-controller-controller-manager-metrics-service"
 
 // metricsRoleBindingName is the name of the RBAC that will be created to allow get the metrics data
-const metricsRoleBindingName = "observability-operator-metrics-binding"
+const metricsRoleBindingName = "kubevirt-observability-controller-metrics-binding"
 
 var _ = Describe("Manager", Ordered, func() {
 	var controllerPodName string
@@ -173,7 +173,7 @@ var _ = Describe("Manager", Ordered, func() {
 		It("should ensure the metrics endpoint is serving metrics", func() {
 			By("creating a ClusterRoleBinding for the service account to allow access to metrics")
 			cmd := exec.Command("kubectl", "create", "clusterrolebinding", metricsRoleBindingName,
-				"--clusterrole=observability-operator-metrics-reader",
+				"--clusterrole=kubevirt-observability-controller-metrics-reader",
 				fmt.Sprintf("--serviceaccount=%s:%s", namespace, serviceAccountName),
 			)
 			_, err := utils.Run(cmd)

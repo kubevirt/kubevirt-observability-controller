@@ -1,6 +1,6 @@
-namespace: observability-operator-system
+namespace: kubevirt-observability-controller-system
 
-namePrefix: observability-operator-
+namePrefix: kubevirt-observability-controller-
 
 resources:
 - ../rbac

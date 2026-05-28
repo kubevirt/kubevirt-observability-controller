@@ -28,6 +28,6 @@ var _ = Describe("Rules Setup", func() {
 		Expect(pr.Spec.Groups).ToNot(BeEmpty())
 		Expect(pr.Name).To(Equal("kubevirt-observability-rules"))
 		Expect(pr.Namespace).To(Equal("kubevirt"))
-		Expect(pr.Labels).To(HaveKeyWithValue("app.kubernetes.io/managed-by", "observability-operator"))
+		Expect(pr.Labels).To(HaveKeyWithValue("app.kubernetes.io/managed-by", "kubevirt-observability-controller"))
 	})
 })

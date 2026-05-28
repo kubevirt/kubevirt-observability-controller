@@ -8,6 +8,6 @@ layout:
 plugins:
   manifests.sdk.operatorframework.io/v2: {}
   scorecard.sdk.operatorframework.io/v2: {}
-projectName: observability-operator
-repo: github.com/kubevirt/observability-operator
+projectName: kubevirt-observability-controller
+repo: github.com/kubevirt/kubevirt-observability-controller
 version: "3"

@@ -66,7 +66,7 @@ var _ = Describe("PrometheusRule Reconciler", func() {
 		}, pr)
 		Expect(err).ToNot(HaveOccurred())
 		Expect(pr.Spec.Groups).ToNot(BeEmpty())
-		Expect(pr.Annotations).To(HaveKeyWithValue("observability-operator.kubevirt.io/version", "0.0.1"))
+		Expect(pr.Annotations).To(HaveKeyWithValue("kubevirt-observability-controller.kubevirt.io/version", "0.0.1"))
 	})
 
 	It("should update PrometheusRule when it already exists but differs", func() {

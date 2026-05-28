@@ -1,4 +1,4 @@
-module github.com/kubevirt/observability-operator
+module github.com/kubevirt/kubevirt-observability-controller
 
 go 1.25.0
 

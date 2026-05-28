@@ -16,7 +16,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
-	"github.com/kubevirt/observability-operator/pkg/monitoring/rules"
+	"github.com/kubevirt/kubevirt-observability-controller/pkg/monitoring/rules"
 )
 
 const (
@@ -68,7 +68,7 @@ func (r *PrometheusRuleReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 	}
 
 	if !equality.Semantic.DeepEqual(existing.Spec, desired.Spec) ||
-		existing.Annotations["observability-operator.kubevirt.io/version"] != r.Version {
+		existing.Annotations["kubevirt-observability-controller.kubevirt.io/version"] != r.Version {
 		existing.Spec = desired.Spec
 		existing.Labels = desired.Labels
 		existing.Annotations = desired.Annotations
@@ -88,7 +88,7 @@ func (r *PrometheusRuleReconciler) buildDesiredPrometheusRule(namespace string) 
 	if pr.Annotations == nil {
 		pr.Annotations = make(map[string]string)
 	}
-	pr.Annotations["observability-operator.kubevirt.io/version"] = r.Version
+	pr.Annotations["kubevirt-observability-controller.kubevirt.io/version"] = r.Version
 
 	return pr, nil
 }
