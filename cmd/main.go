@@ -22,6 +22,7 @@ import (
 	"flag"
 	"os"
 	"path/filepath"
+	"strings"
 
 	// Import all Kubernetes client auth plugins (e.g. Azure, GCP, OIDC, etc.)
 	// to ensure that exec-entrypoint and run can make use of them.
@@ -75,6 +76,7 @@ func main() {
 	var probeAddr string
 	var secureMetrics bool
 	var enableHTTP2 bool
+	var metricsAllowlist string
 	var tlsOpts []func(*tls.Config)
 	flag.StringVar(&metricsAddr, "metrics-bind-address", ":8080", "The address the metrics endpoint binds to. "+
 		"Use :8443 for HTTPS or :8080 for HTTP, or set to 0 to disable the metrics service.")
@@ -93,6 +95,8 @@ func main() {
 	flag.StringVar(&metricsCertKey, "metrics-cert-key", "tls.key", "The name of the metrics server key file.")
 	flag.BoolVar(&enableHTTP2, "enable-http2", false,
 		"If set, HTTP/2 will be enabled for the metrics and webhook servers")
+	flag.StringVar(&metricsAllowlist, "metrics-allowlist", "",
+		"Comma-separated list of metric names to expose. Empty (default) exposes all. \"none\" disables all custom metrics.")
 	opts := zap.Options{
 		Development: true,
 	}
@@ -190,9 +194,24 @@ func main() {
 		})
 	}
 
-	if err := metrics.SetupMetrics(nil, nil); err != nil {
+	allowlist := parseMetricsAllowlist(metricsAllowlist)
+	if err := metrics.SetupMetrics(nil, nil, allowlist); err != nil {
 		setupLog.Error(err, "unable to set up metrics")
 		os.Exit(1)
+	}
+
+	if allowlist != nil {
+		registered := metrics.ListMetrics()
+		registeredNames := make(map[string]bool, len(registered))
+		for _, m := range registered {
+			registeredNames[m.GetOpts().Name] = true
+		}
+		for name := range allowlist {
+			if !registeredNames[name] {
+				setupLog.Info("metrics-allowlist contains unknown metric name", "metric", name)
+			}
+		}
+		setupLog.Info("metrics allowlist active", "count", len(registered))
 	}
 
 	kvPodRequirement, _ := labels.NewRequirement(
@@ -277,4 +296,21 @@ func main() {
 		setupLog.Error(err, "problem running manager")
 		os.Exit(1)
 	}
+}
+
+func parseMetricsAllowlist(raw string) map[string]bool {
+	if raw == "" {
+		return nil
+	}
+	if raw == "none" {
+		return map[string]bool{}
+	}
+	parts := strings.Split(raw, ",")
+	allowlist := make(map[string]bool, len(parts))
+	for _, p := range parts {
+		if name := strings.TrimSpace(p); name != "" {
+			allowlist[name] = true
+		}
+	}
+	return allowlist
 }

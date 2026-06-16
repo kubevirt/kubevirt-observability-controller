@@ -15,7 +15,9 @@ var (
 func getStores() *Stores     { return storesRef.Load() }
 func getIndexers() *Indexers { return indexersRef.Load() }
 
-func SetupMetrics(metricsStores *Stores, metricsIndexers *Indexers) error {
+// SetupMetrics registers metric collectors filtered by the given allowlist.
+// A nil allowlist registers all metrics. An empty (non-nil) map registers none.
+func SetupMetrics(metricsStores *Stores, metricsIndexers *Indexers, allowlist map[string]bool) error {
 	if metricsStores == nil {
 		metricsStores = &Stores{}
 	}
@@ -27,12 +29,63 @@ func SetupMetrics(metricsStores *Stores, metricsIndexers *Indexers) error {
 	indexersRef.Store(metricsIndexers)
 
 	operatormetrics.Register = ctrlmetrics.Registry.Register
+	operatormetrics.Unregister = ctrlmetrics.Registry.Unregister
 
-	return operatormetrics.RegisterCollector(
+	allCollectors := []operatormetrics.Collector{
 		MigrationStatsCollector,
 		VMIStatsCollector,
 		VMStatsCollector,
-	)
+	}
+
+	if allowlist == nil {
+		return operatormetrics.RegisterCollector(allCollectors...)
+	}
+
+	var filtered []operatormetrics.Collector
+	for _, c := range allCollectors {
+		if fc := filterCollector(c, allowlist); fc != nil {
+			filtered = append(filtered, *fc)
+		}
+	}
+
+	if len(filtered) == 0 {
+		return nil
+	}
+
+	return operatormetrics.RegisterCollector(filtered...)
+}
+
+func filterCollector(c operatormetrics.Collector, allowlist map[string]bool) *operatormetrics.Collector {
+	var kept []operatormetrics.Metric
+	for _, m := range c.Metrics {
+		if allowlist[m.GetOpts().Name] {
+			kept = append(kept, m)
+		}
+	}
+
+	if len(kept) == 0 {
+		return nil
+	}
+
+	allowedSet := make(map[string]bool, len(kept))
+	for _, m := range kept {
+		allowedSet[m.GetOpts().Name] = true
+	}
+
+	originalCallback := c.CollectCallback
+	return &operatormetrics.Collector{
+		Metrics: kept,
+		CollectCallback: func() []operatormetrics.CollectorResult {
+			results := originalCallback()
+			filtered := make([]operatormetrics.CollectorResult, 0, len(results))
+			for _, r := range results {
+				if allowedSet[r.Metric.GetOpts().Name] {
+					filtered = append(filtered, r)
+				}
+			}
+			return filtered
+		},
+	}
 }
 
 func SetStores(s *Stores, i *Indexers) {
