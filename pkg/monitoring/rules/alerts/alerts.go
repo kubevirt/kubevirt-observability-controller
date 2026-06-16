@@ -27,8 +27,8 @@ const (
 	fiveMinutes   = 5
 )
 
-func Register(registry *operatorrules.Registry, namespace string) error {
-	alerts := [][]promv1.Rule{
+func Register(registry *operatorrules.Registry, namespace string, allowlist map[string]bool) error {
+	allAlerts := [][]promv1.Rule{
 		systemAlerts(namespace),
 		virtAPIAlerts(namespace),
 		virtControllerAlerts(namespace),
@@ -37,8 +37,14 @@ func Register(registry *operatorrules.Registry, namespace string) error {
 		vmsAlerts,
 	}
 
+	if allowlist != nil {
+		for i := range allAlerts {
+			allAlerts[i] = filterAlerts(allAlerts[i], allowlist)
+		}
+	}
+
 	runbookURLTemplate := getRunbookURLTemplate()
-	for _, alertGroup := range alerts {
+	for _, alertGroup := range allAlerts {
 		for i := range alertGroup {
 			alertGroup[i].Labels[partOfAlertLabelKey] = kubevirtLabelValue
 			alertGroup[i].Labels[componentAlertLabelKey] = kubevirtLabelValue
@@ -46,7 +52,17 @@ func Register(registry *operatorrules.Registry, namespace string) error {
 		}
 	}
 
-	return registry.RegisterAlerts(alerts...)
+	return registry.RegisterAlerts(allAlerts...)
+}
+
+func filterAlerts(rules []promv1.Rule, allowlist map[string]bool) []promv1.Rule {
+	var filtered []promv1.Rule
+	for _, r := range rules {
+		if allowlist[r.Alert] {
+			filtered = append(filtered, r)
+		}
+	}
+	return filtered
 }
 
 func getRunbookURLTemplate() string {

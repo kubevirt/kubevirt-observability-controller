@@ -22,7 +22,7 @@ var _ = Describe("Recording Rules", func() {
 	})
 
 	It("should register all recording rules without error", func() {
-		err := Register(registry, "kubevirt")
+		err := Register(registry, "kubevirt", nil)
 		Expect(err).ToNot(HaveOccurred())
 
 		rules := registry.ListRecordingRules()
@@ -30,7 +30,7 @@ var _ = Describe("Recording Rules", func() {
 	})
 
 	It("should include node recording rules", func() {
-		err := Register(registry, "kubevirt")
+		err := Register(registry, "kubevirt", nil)
 		Expect(err).ToNot(HaveOccurred())
 		rules := registry.ListRecordingRules()
 
@@ -45,7 +45,7 @@ var _ = Describe("Recording Rules", func() {
 	})
 
 	It("should include VM recording rules", func() {
-		err := Register(registry, "kubevirt")
+		err := Register(registry, "kubevirt", nil)
 		Expect(err).ToNot(HaveOccurred())
 		rules := registry.ListRecordingRules()
 
@@ -58,7 +58,7 @@ var _ = Describe("Recording Rules", func() {
 	})
 
 	It("should include VMI recording rules", func() {
-		err := Register(registry, "kubevirt")
+		err := Register(registry, "kubevirt", nil)
 		Expect(err).ToNot(HaveOccurred())
 		rules := registry.ListRecordingRules()
 
@@ -72,7 +72,7 @@ var _ = Describe("Recording Rules", func() {
 	})
 
 	It("should include deprecated recording rules", func() {
-		err := Register(registry, "kubevirt")
+		err := Register(registry, "kubevirt", nil)
 		Expect(err).ToNot(HaveOccurred())
 		rules := registry.ListRecordingRules()
 
@@ -86,7 +86,7 @@ var _ = Describe("Recording Rules", func() {
 	})
 
 	It("should include virt component recording rules with namespace", func() {
-		err := Register(registry, "test-namespace")
+		err := Register(registry, "test-namespace", nil)
 		Expect(err).ToNot(HaveOccurred())
 		rules := registry.ListRecordingRules()
 
@@ -98,5 +98,35 @@ var _ = Describe("Recording Rules", func() {
 		Expect(ruleNames).To(HaveKey("cluster:kubevirt_virt_api_up:sum"))
 		Expect(ruleNames).To(HaveKey("cluster:kubevirt_virt_controller_up:sum"))
 		Expect(ruleNames).To(HaveKey("cluster:kubevirt_virt_handler_up:sum"))
+	})
+
+	Context("allowlist filtering", func() {
+		It("should register only allowlisted recording rules", func() {
+			allowlist := map[string]bool{
+				"cluster:kubevirt_virt_api_up:sum":           true,
+				"cluster:kubevirt_non_schedulable_nodes:sum": true,
+			}
+			err := Register(registry, "kubevirt", allowlist)
+			Expect(err).ToNot(HaveOccurred())
+
+			rules := registry.ListRecordingRules()
+			Expect(rules).To(HaveLen(2))
+
+			ruleNames := make(map[string]bool)
+			for _, r := range rules {
+				ruleNames[r.GetOpts().Name] = true
+			}
+
+			Expect(ruleNames).To(HaveKey("cluster:kubevirt_virt_api_up:sum"))
+			Expect(ruleNames).To(HaveKey("cluster:kubevirt_non_schedulable_nodes:sum"))
+		})
+
+		It("should register no recording rules when allowlist is empty map", func() {
+			err := Register(registry, "kubevirt", map[string]bool{})
+			Expect(err).ToNot(HaveOccurred())
+
+			rules := registry.ListRecordingRules()
+			Expect(rules).To(BeEmpty())
+		})
 	})
 })

@@ -77,6 +77,8 @@ func main() {
 	var secureMetrics bool
 	var enableHTTP2 bool
 	var metricsAllowlist string
+	var alertsAllowlistRaw string
+	var recordingRulesAllowlistRaw string
 	var tlsOpts []func(*tls.Config)
 	flag.StringVar(&metricsAddr, "metrics-bind-address", ":8080", "The address the metrics endpoint binds to. "+
 		"Use :8443 for HTTPS or :8080 for HTTP, or set to 0 to disable the metrics service.")
@@ -97,6 +99,12 @@ func main() {
 		"If set, HTTP/2 will be enabled for the metrics and webhook servers")
 	flag.StringVar(&metricsAllowlist, "metrics-allowlist", "",
 		"Comma-separated list of metric names to expose. Empty (default) exposes all. \"none\" disables all custom metrics.")
+	flag.StringVar(&alertsAllowlistRaw, "alerts-allowlist", "",
+		"Comma-separated list of alert names to include in the PrometheusRule. "+
+			"Empty (default) includes all. \"none\" disables all alerts.")
+	flag.StringVar(&recordingRulesAllowlistRaw, "recording-rules-allowlist", "",
+		"Comma-separated list of recording rule names to include in the PrometheusRule. "+
+			"Empty (default) includes all. \"none\" disables all recording rules.")
 	opts := zap.Options{
 		Development: true,
 	}
@@ -194,7 +202,9 @@ func main() {
 		})
 	}
 
-	allowlist := parseMetricsAllowlist(metricsAllowlist)
+	allowlist := parseAllowlist(metricsAllowlist)
+	alertsAllowlist := parseAllowlist(alertsAllowlistRaw)
+	recordingRulesAllowlist := parseAllowlist(recordingRulesAllowlistRaw)
 	if err := metrics.SetupMetrics(nil, nil, allowlist); err != nil {
 		setupLog.Error(err, "unable to set up metrics")
 		os.Exit(1)
@@ -249,9 +259,11 @@ func main() {
 	}
 
 	if err := (&controller.PrometheusRuleReconciler{
-		Client:  mgr.GetClient(),
-		Scheme:  mgr.GetScheme(),
-		Version: "0.0.1",
+		Client:                  mgr.GetClient(),
+		Scheme:                  mgr.GetScheme(),
+		Version:                 "0.0.1",
+		AlertsAllowlist:         alertsAllowlist,
+		RecordingRulesAllowlist: recordingRulesAllowlist,
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "PrometheusRule")
 		os.Exit(1)
@@ -298,13 +310,14 @@ func main() {
 	}
 }
 
-func parseMetricsAllowlist(raw string) map[string]bool {
+func parseAllowlist(raw string) map[string]bool {
 	if raw == "" {
 		return nil
 	}
 	if raw == "none" {
 		return map[string]bool{}
 	}
+
 	parts := strings.Split(raw, ",")
 	allowlist := make(map[string]bool, len(parts))
 	for _, p := range parts {
@@ -312,5 +325,6 @@ func parseMetricsAllowlist(raw string) map[string]bool {
 			allowlist[name] = true
 		}
 	}
+
 	return allowlist
 }

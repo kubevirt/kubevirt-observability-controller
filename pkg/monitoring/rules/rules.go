@@ -10,12 +10,20 @@ import (
 
 var registry = operatorrules.NewRegistry()
 
-func SetupRules(namespace string) error {
-	if err := recordingrules.Register(registry, namespace); err != nil {
+func ResetRegistry() {
+	registry = operatorrules.NewRegistry()
+}
+
+func SetupRules(namespace string, alertsAllowlist, recordingRulesAllowlist map[string]bool) error {
+	if err := recordingrules.Register(registry, namespace, recordingRulesAllowlist); err != nil {
 		return err
 	}
 
-	return alerts.Register(registry, namespace)
+	return alerts.Register(registry, namespace, alertsAllowlist)
+}
+
+func HasRegisteredRules() bool {
+	return len(registry.ListAlerts()) > 0 || len(registry.ListRecordingRules()) > 0
 }
 
 func BuildPrometheusRule(name, namespace string) (*promv1.PrometheusRule, error) {

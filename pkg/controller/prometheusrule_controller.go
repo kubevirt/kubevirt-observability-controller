@@ -25,8 +25,10 @@ const (
 
 type PrometheusRuleReconciler struct {
 	client.Client
-	Scheme  *runtime.Scheme
-	Version string
+	Scheme                  *runtime.Scheme
+	Version                 string
+	AlertsAllowlist         map[string]bool
+	RecordingRulesAllowlist map[string]bool
 }
 
 func (r *PrometheusRuleReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
@@ -44,8 +46,22 @@ func (r *PrometheusRuleReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 
 	namespace := kvList.Items[0].Namespace
 
-	if err := rules.SetupRules(namespace); err != nil {
+	if err := rules.SetupRules(namespace, r.AlertsAllowlist, r.RecordingRulesAllowlist); err != nil {
 		return ctrl.Result{}, fmt.Errorf("setting up rules: %w", err)
+	}
+
+	existing := &monitoringv1.PrometheusRule{}
+	getErr := r.Get(ctx, types.NamespacedName{
+		Name:      prometheusRuleName,
+		Namespace: namespace,
+	}, existing)
+
+	if !rules.HasRegisteredRules() {
+		if getErr == nil {
+			logger.Info("No rules registered, deleting PrometheusRule", "name", prometheusRuleName, "namespace", namespace)
+			return ctrl.Result{}, r.Delete(ctx, existing)
+		}
+		return ctrl.Result{}, nil
 	}
 
 	desired, err := r.buildDesiredPrometheusRule(namespace)
@@ -53,18 +69,12 @@ func (r *PrometheusRuleReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 		return ctrl.Result{}, fmt.Errorf("building PrometheusRule: %w", err)
 	}
 
-	existing := &monitoringv1.PrometheusRule{}
-	err = r.Get(ctx, types.NamespacedName{
-		Name:      prometheusRuleName,
-		Namespace: namespace,
-	}, existing)
-
-	if errors.IsNotFound(err) {
+	if errors.IsNotFound(getErr) {
 		logger.Info("Creating PrometheusRule", "name", prometheusRuleName, "namespace", namespace)
 		return ctrl.Result{}, r.Create(ctx, desired)
 	}
-	if err != nil {
-		return ctrl.Result{}, err
+	if getErr != nil {
+		return ctrl.Result{}, getErr
 	}
 
 	if !equality.Semantic.DeepEqual(existing.Spec, desired.Spec) ||
