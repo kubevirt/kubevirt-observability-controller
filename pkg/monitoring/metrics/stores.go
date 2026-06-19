@@ -11,6 +11,7 @@ type Stores struct {
 	Preference          cache.Store
 	ClusterPreference   cache.Store
 	ControllerRevision  cache.Store
+	VirtHandlerPod      cache.Store
 }
 
 type Indexers struct {

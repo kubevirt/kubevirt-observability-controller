@@ -103,6 +103,7 @@ func SetupInformers(ctx context.Context, c ctrlcache.Cache) error {
 			Preference:          preference.GetStore(),
 			ClusterPreference:   clusterPreference.GetStore(),
 			ControllerRevision:  controllerRevision.GetStore(),
+			VirtHandlerPod:      pod.GetStore(),
 		},
 		&Indexers{
 			VMIMigration: vmim.GetIndexer(),

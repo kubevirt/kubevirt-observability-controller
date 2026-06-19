@@ -20,30 +20,29 @@ import (
 	"context"
 	"crypto/tls"
 	"flag"
+	"fmt"
+	"net/http"
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	// Import all Kubernetes client auth plugins (e.g. Azure, GCP, OIDC, etc.)
 	// to ensure that exec-entrypoint and run can make use of them.
 	_ "k8s.io/client-go/plugin/pkg/client/auth"
 
 	monitoringv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
-	k8sv1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/selection"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	k6tv1 "kubevirt.io/api/core/v1"
 	instancetypev1beta1 "kubevirt.io/api/instancetype/v1beta1"
 	ctrl "sigs.k8s.io/controller-runtime"
-	"sigs.k8s.io/controller-runtime/pkg/cache"
-	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 
 	"github.com/kubevirt/kubevirt-observability-controller/pkg/controller"
 	"github.com/kubevirt/kubevirt-observability-controller/pkg/monitoring/metrics"
+	"github.com/kubevirt/kubevirt-observability-controller/pkg/monitoring/metrics/vmstats"
 	"sigs.k8s.io/controller-runtime/pkg/certwatcher"
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
@@ -105,6 +104,17 @@ func main() {
 	flag.StringVar(&recordingRulesAllowlistRaw, "recording-rules-allowlist", "",
 		"Comma-separated list of recording rule names to include in the PrometheusRule. "+
 			"Empty (default) includes all. \"none\" disables all recording rules.")
+	var enableVMStats bool
+	var vmstatsPort int
+	var vmstatsCertPath, vmstatsCertName, vmstatsCertKey string
+	flag.BoolVar(&enableVMStats, "enable-vmstats", false,
+		"Enable VMStats polling from virt-handler endpoints.")
+	flag.IntVar(&vmstatsPort, "vmstats-port", 8187,
+		"The port on virt-handler where the /v1/vmstats endpoint is served.")
+	flag.StringVar(&vmstatsCertPath, "vmstats-cert-path", "",
+		"The directory that contains the client certificate for authenticating to virt-handler vmstats endpoint.")
+	flag.StringVar(&vmstatsCertName, "vmstats-cert-name", "tls.crt", "The name of the vmstats client certificate file.")
+	flag.StringVar(&vmstatsCertKey, "vmstats-cert-key", "tls.key", "The name of the vmstats client key file.")
 	opts := zap.Options{
 		Development: true,
 	}
@@ -224,11 +234,6 @@ func main() {
 		setupLog.Info("metrics allowlist active", "count", len(registered))
 	}
 
-	kvPodRequirement, _ := labels.NewRequirement(
-		"kubevirt.io/created-by", selection.Exists, nil,
-	)
-	kvPodSelector := labels.NewSelector().Add(*kvPodRequirement)
-
 	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{
 		Scheme:                 scheme,
 		Metrics:                metricsServerOptions,
@@ -236,11 +241,6 @@ func main() {
 		HealthProbeBindAddress: probeAddr,
 		LeaderElection:         enableLeaderElection,
 		LeaderElectionID:       "e0e374f1.kubevirt.io",
-		Cache: cache.Options{
-			ByObject: map[client.Object]cache.ByObject{
-				&k8sv1.Pod{}: {Label: kvPodSelector},
-			},
-		},
 		// LeaderElectionReleaseOnCancel defines if the leader should step down voluntarily
 		// when the Manager ends. This requires the binary to immediately end when the
 		// Manager is stopped, otherwise, this setting is unsafe. Setting this significantly
@@ -276,6 +276,12 @@ func main() {
 		os.Exit(1)
 	}
 
+	if enableVMStats {
+		setupVMStats(mgr, vmstatsPort, vmstatsCertPath, vmstatsCertName, vmstatsCertKey, allowlist)
+	} else {
+		setupLog.Info("VMStats polling disabled")
+	}
+
 	// +kubebuilder:scaffold:builder
 
 	if metricsCertWatcher != nil {
@@ -306,6 +312,80 @@ func main() {
 	setupLog.Info("starting manager")
 	if err := mgr.Start(ctrl.SetupSignalHandler()); err != nil {
 		setupLog.Error(err, "problem running manager")
+		os.Exit(1)
+	}
+}
+
+func setupVMStats(
+	mgr manager.Manager,
+	vmstatsPort int, vmstatsCertPath, vmstatsCertName, vmstatsCertKey string,
+	allowlist map[string]bool,
+) {
+	if vmstatsCertPath == "" {
+		setupLog.Error(fmt.Errorf("vmstats-cert-path is required when vmstats is enabled"), "missing required flag")
+		os.Exit(1)
+	}
+
+	certFile := filepath.Join(vmstatsCertPath, vmstatsCertName)
+	keyFile := filepath.Join(vmstatsCertPath, vmstatsCertKey)
+	cert, err := tls.LoadX509KeyPair(certFile, keyFile)
+	if err != nil {
+		setupLog.Error(err, "unable to load vmstats client certificate")
+		os.Exit(1)
+	}
+
+	httpClient := &http.Client{
+		Timeout: 30 * time.Second,
+		Transport: &http.Transport{
+			TLSClientConfig: &tls.Config{
+				InsecureSkipVerify: true,
+				MinVersion:         tls.VersionTLS12,
+				Certificates:       []tls.Certificate{cert},
+			},
+		},
+	}
+
+	vmStatsClient := vmstats.NewVMStatsClient(httpClient, vmstatsPort)
+	statsCache := vmstats.NewStatsCache()
+
+	if err := vmstats.RegisterCollector(statsCache, allowlist); err != nil {
+		setupLog.Error(err, "unable to register vmstats collector")
+		os.Exit(1)
+	}
+
+	if err := mgr.Add(manager.RunnableFunc(func(ctx context.Context) error {
+		if !mgr.GetCache().WaitForCacheSync(ctx) {
+			return fmt.Errorf("cache sync failed")
+		}
+
+		var stores *metrics.Stores
+		for {
+			stores = metrics.GetStores()
+			if stores != nil && stores.VMI != nil && stores.VirtHandlerPod != nil {
+				break
+			}
+			setupLog.Info("waiting for metrics stores to be initialized")
+			select {
+			case <-ctx.Done():
+				return ctx.Err()
+			case <-time.After(1 * time.Second):
+			}
+		}
+
+		poller := vmstats.NewPoller(
+			vmstats.PollerConfig{
+				PollInterval:  30 * time.Second,
+				MaxConcurrent: 10,
+				Port:          vmstatsPort,
+			},
+			statsCache,
+			vmStatsClient,
+			stores.VMI,
+			stores.VirtHandlerPod,
+		)
+		return poller.Start(ctx)
+	})); err != nil {
+		setupLog.Error(err, "unable to add vmstats poller")
 		os.Exit(1)
 	}
 }

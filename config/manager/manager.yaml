@@ -29,6 +29,7 @@ spec:
       labels:
         control-plane: controller-manager
         app.kubernetes.io/name: kubevirt-observability-controller
+        kubevirt.io: virt-observability-controller
     spec:
       # TODO(user): Uncomment the following code to configure the nodeAffinity expression
       # according to the platforms which are supported by your solution.
@@ -63,6 +64,8 @@ spec:
         args:
           - --leader-elect
           - --health-probe-bind-address=:8081
+          - --enable-vmstats
+          - --vmstats-cert-path=/etc/monitoring/clientcertificates
         image: controller:latest
         name: manager
         ports: []
@@ -92,7 +95,14 @@ spec:
           requests:
             cpu: 10m
             memory: 64Mi
-        volumeMounts: []
-      volumes: []
+        volumeMounts:
+          - name: monitoring-client-cert
+            mountPath: /etc/monitoring/clientcertificates
+            readOnly: true
+      volumes:
+        - name: monitoring-client-cert
+          secret:
+            secretName: kubevirt-virt-handler-monitoring-client-certs
+            optional: true
       serviceAccountName: controller-manager
       terminationGracePeriodSeconds: 10

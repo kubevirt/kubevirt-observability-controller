@@ -88,6 +88,8 @@ func filterCollector(c operatormetrics.Collector, allowlist map[string]bool) *op
 	}
 }
 
+func GetStores() *Stores { return getStores() }
+
 func SetStores(s *Stores, i *Indexers) {
 	storesRef.Store(s)
 	indexersRef.Store(i)
