@@ -3,7 +3,7 @@ kind: Namespace
 metadata:
   labels:
     control-plane: controller-manager
-    app.kubernetes.io/name: kubevirt-observability-controller
+    app.kubernetes.io/name: virt-observability-controller
     app.kubernetes.io/managed-by: kustomize
   name: system
 ---
@@ -14,13 +14,13 @@ metadata:
   namespace: system
   labels:
     control-plane: controller-manager
-    app.kubernetes.io/name: kubevirt-observability-controller
+    app.kubernetes.io/name: virt-observability-controller
     app.kubernetes.io/managed-by: kustomize
 spec:
   selector:
     matchLabels:
       control-plane: controller-manager
-      app.kubernetes.io/name: kubevirt-observability-controller
+      app.kubernetes.io/name: virt-observability-controller
   replicas: 2
   template:
     metadata:
@@ -28,7 +28,7 @@ spec:
         kubectl.kubernetes.io/default-container: manager
       labels:
         control-plane: controller-manager
-        app.kubernetes.io/name: kubevirt-observability-controller
+        app.kubernetes.io/name: virt-observability-controller
         kubevirt.io: virt-observability-controller
     spec:
       # TODO(user): Uncomment the following code to configure the nodeAffinity expression
