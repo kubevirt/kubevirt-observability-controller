@@ -117,8 +117,12 @@ test-e2e: ## Run e2e tests against a KubeVirt cluster.
 	go test ./test/monitoring/rules/ -v -ginkgo.v -ginkgo.show-node-events -timeout 30m
 	go test ./test/monitoring/metrics/ -v -ginkgo.v -ginkgo.show-node-events -timeout 30m
 
+.PHONY: check-boilerplate
+check-boilerplate: ## Check that all Go files have the boilerplate header.
+	./hack/check-boilerplate.sh
+
 .PHONY: lint
-lint: golangci-lint ## Run golangci-lint linter
+lint: golangci-lint check-boilerplate ## Run golangci-lint linter
 	$(GOLANGCI_LINT) run
 
 .PHONY: lint-fix
