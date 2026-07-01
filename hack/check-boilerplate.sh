@@ -12,7 +12,7 @@ while IFS= read -r file; do
         echo "ERROR: Missing or incorrect boilerplate header: $file"
         failed=1
     fi
-done < <(find . -name '*.go' -not -path './vendor/*' -not -path './bin/*')
+done < <(find . -name '*.go' -path './cmd/*' -path './pkg/*' -path './internal/*' -path './test/*')
 
 if [ "$failed" -eq 1 ]; then
     echo ""

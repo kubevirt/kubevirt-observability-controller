@@ -94,11 +94,15 @@ help: ## Display this help.
 
 .PHONY: manifests
 manifests: controller-gen ## Generate ClusterRole objects.
-	$(CONTROLLER_GEN) rbac:roleName=manager-role paths="./..."
+	$(CONTROLLER_GEN) rbac:roleName=manager-role paths="./cmd/..." paths="./pkg/..."
 
 .PHONY: generate
 generate: controller-gen ## Generate code containing DeepCopy, DeepCopyInto, and DeepCopyObject method implementations.
-	$(CONTROLLER_GEN) object:headerFile="hack/boilerplate.go.txt" paths="./..."
+	$(CONTROLLER_GEN) object:headerFile="hack/boilerplate.go.txt" paths="./cmd/..." paths="./pkg/..."
+
+.PHONY: generate-verify
+generate-verify: generate # Verify that generated code is up-to-date.
+	./hack/verify-generate.sh
 
 .PHONY: fmt
 fmt: ## Run go fmt against code.
@@ -165,11 +169,9 @@ PLATFORMS ?= linux/arm64,linux/amd64,linux/s390x,linux/ppc64le
 docker-buildx: ## Build and push docker image for the manager for cross-platform support
 	# copy existing Dockerfile and insert --platform=${BUILDPLATFORM} into Dockerfile.cross, and preserve the original Dockerfile
 	sed -e '1 s/\(^FROM\)/FROM --platform=\$$\{BUILDPLATFORM\}/; t' -e ' 1,// s//FROM --platform=\$$\{BUILDPLATFORM\}/' Dockerfile > Dockerfile.cross
-	- $(CONTAINER_TOOL) buildx create --name virt-observability-controller-builder
-	$(CONTAINER_TOOL) buildx use virt-observability-controller-builder
-	- $(CONTAINER_TOOL) buildx build --push --platform=$(PLATFORMS) --tag ${IMG} -f Dockerfile.cross .
-	- $(CONTAINER_TOOL) buildx rm virt-observability-controller-builder
-	rm Dockerfile.cross
+	$(CONTAINER_TOOL) manifest rm ${IMG} 2>/dev/null || true
+	$(CONTAINER_TOOL) build --platform=$(PLATFORMS) --manifest ${IMG} -f Dockerfile.cross .
+	$(CONTAINER_TOOL) manifest push ${IMG}
 
 .PHONY: build-installer
 build-installer: manifests generate kustomize ## Generate a consolidated YAML with deployment.
