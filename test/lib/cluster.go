@@ -127,14 +127,35 @@ func DeleteTestVMI(namespace string) error {
 
 func WaitForVMIRunning(namespace, name string, timeout time.Duration) error {
 	deadline := time.Now().Add(timeout)
+	var lastPhase string
 	for time.Now().Before(deadline) {
 		out, err := Kubectl("get", "vmi", name, "-n", namespace,
 			"-o", "jsonpath={.status.phase}")
 		if err == nil && out == "Running" {
 			return nil
 		}
+		if err == nil {
+			lastPhase = out
+		}
 		time.Sleep(2 * time.Second)
 	}
-	return fmt.Errorf("VMI %s/%s did not reach Running phase within %v",
-		namespace, name, timeout)
+
+	diag := fmt.Sprintf("VMI %s/%s did not reach Running phase within %v (last phase: %q)\n",
+		namespace, name, timeout, lastPhase)
+
+	if vmiYAML, err := Kubectl("get", "vmi", name, "-n", namespace, "-o", "yaml"); err == nil {
+		diag += fmt.Sprintf("\n--- VMI Status ---\n%s\n", vmiYAML)
+	}
+	if events, err := Kubectl("get", "events", "-n", namespace,
+		"--field-selector", fmt.Sprintf("involvedObject.name=%s", name),
+		"--sort-by=.lastTimestamp"); err == nil {
+		diag += fmt.Sprintf("\n--- VMI Events ---\n%s\n", events)
+	}
+	if pods, err := Kubectl("get", "pods", "-n", namespace,
+		"-l", fmt.Sprintf("kubevirt.io/domain=%s", name),
+		"-o", "wide"); err == nil {
+		diag += fmt.Sprintf("\n--- Launcher Pod ---\n%s\n", pods)
+	}
+
+	return fmt.Errorf("%s", diag)
 }
