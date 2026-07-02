@@ -14,7 +14,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+export KUBEVIRT_PROVIDER=k8s-1.36
 export KUBEVIRT_TAG="${KUBEVIRT_TAG:-main}"
+export KUBEVIRT_MEMORY_SIZE="${KUBEVIRT_MEMORY_SIZE:-9216M}"
 export KUBEVIRT_DEPLOY_NP=true
 export KUBEVIRT_DEPLOY_PROMETHEUS=true
 export FEATURE_GATES="VMStatsCollector"
