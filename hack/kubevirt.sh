@@ -16,6 +16,7 @@
 
 export KUBEVIRT_TAG="${KUBEVIRT_TAG:-main}"
 export KUBEVIRT_DEPLOY_NP=true
+export KUBEVIRT_DEPLOY_PROMETHEUS=true
 export FEATURE_GATES="VMStatsCollector"
 
 _base_dir=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
