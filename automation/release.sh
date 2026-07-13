@@ -75,7 +75,14 @@ function create_github_release() {
 }
 
 function publish_image() {
-    make docker-buildx IMG="${DOCKER_PREFIX}/virt-observability-controller:${DOCKER_TAG}"
+    local img="${DOCKER_PREFIX}/virt-observability-controller"
+    make docker-buildx IMG="${img}:${DOCKER_TAG}"
+
+    if [ "${DOCKER_TAG}" = "latest" ]; then
+        make docker-retag IMG="${img}:${DOCKER_TAG}" NEW_IMG="${img}:$(date +%s)"
+    elif [[ "${DOCKER_TAG}" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+        make docker-retag IMG="${img}:${DOCKER_TAG}" NEW_IMG="${img}:stable"
+    fi
 }
 
 function main() {

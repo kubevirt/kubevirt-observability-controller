@@ -173,6 +173,10 @@ docker-buildx: ## Build and push docker image for the manager for cross-platform
 	$(CONTAINER_TOOL) build --platform=$(PLATFORMS) --manifest ${IMG} -f Dockerfile.cross .
 	$(CONTAINER_TOOL) manifest push ${IMG}
 
+.PHONY: docker-retag
+docker-retag: ## Push an existing local manifest under a new tag
+	$(CONTAINER_TOOL) manifest push $(IMG) docker://$(NEW_IMG)
+
 .PHONY: build-installer
 build-installer: manifests generate kustomize ## Generate a consolidated YAML with deployment.
 	mkdir -p dist
