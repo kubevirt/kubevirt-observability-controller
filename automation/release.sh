@@ -58,7 +58,7 @@ function update_github_release() {
     gh release upload --repo "$GITHUB_REPOSITORY" --clobber "$DOCKER_TAG" dist/install.yaml
 }
 
-function github_release() {
+function setup_github_release() {
     GIT_ASKPASS="$(pwd)/automation/git-askpass.sh"
     [ -f "$GIT_ASKPASS" ] || exit 1
     export GIT_ASKPASS
@@ -66,10 +66,12 @@ function github_release() {
     ensure_gh_cli_installed
 
     gh auth login --with-token <"$GITHUB_TOKEN_PATH"
+}
 
+function create_github_release() {
     build_release_artifacts
     update_github_release
-    update_github_source_tarball_signature
+    # update_github_source_tarball_signature
 }
 
 function publish_image() {
@@ -87,10 +89,14 @@ function main() {
     fi
 
     if [ "${GITHUB_RELEASE:-false}" = "true" ]; then
-        github_release
+        setup_github_release
     fi
 
     publish_image
+
+    if [ "${GITHUB_RELEASE:-false}" = "true" ]; then
+        create_github_release
+    fi
 }
 
 main "$@"
