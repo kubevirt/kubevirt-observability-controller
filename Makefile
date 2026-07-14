@@ -99,6 +99,7 @@ manifests: controller-gen ## Generate ClusterRole objects.
 .PHONY: generate
 generate: controller-gen ## Generate code containing DeepCopy, DeepCopyInto, and DeepCopyObject method implementations.
 	$(CONTROLLER_GEN) object:headerFile="hack/boilerplate.go.txt" paths="./cmd/..." paths="./pkg/..."
+	go run ./hack/gen-metrics-docs > docs/metrics.md
 
 .PHONY: generate-verify
 generate-verify: generate # Verify that generated code is up-to-date.

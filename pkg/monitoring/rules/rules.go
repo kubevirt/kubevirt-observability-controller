@@ -53,3 +53,7 @@ func BuildPrometheusRule(name, namespace string) (*promv1.PrometheusRule, error)
 		},
 	)
 }
+
+func ListRecordingRules() []operatorrules.RecordingRule {
+	return registry.ListRecordingRules()
+}
