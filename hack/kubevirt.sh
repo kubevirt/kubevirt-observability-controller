@@ -42,6 +42,10 @@ function kubevirt::down() {
   make cluster-down -C "${_base_dir}/_kubevirt"
 }
 
+function kubevirt::sync() {
+  make cluster-sync -C "${_base_dir}/_kubevirt"
+}
+
 function kubevirt::kubeconfig() {
   "${_base_dir}/_kubevirt/kubevirtci/cluster-up/kubeconfig.sh"
 }
@@ -61,7 +65,7 @@ case ${_action} in
     kubevirt::down
     ;;
   "sync")
-    KUBECTL=${_kubectl} KUBESSH=${_kubessh} KUBEVIRTCI_REGISTRY=$(kubevirt::registry) "${_base_dir}/hack/sync.sh"
+    kubevirt::sync
     ;;
   "ssh")
     ${_kubessh} "$@"
