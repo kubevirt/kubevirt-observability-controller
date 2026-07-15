@@ -1,0 +1,7 @@
+# This patch adds the args to enable the vmstats poller
+- op: add
+  path: /spec/template/spec/containers/0/args/-
+  value: --enable-vmstats
+- op: add
+  path: /spec/template/spec/containers/0/args/-
+  value: --vmstats-cert-path=/etc/monitoring/clientcertificates

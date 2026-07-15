@@ -75,9 +75,9 @@ var _ = Describe("PrometheusRule Reconciler", func() {
 			Build()
 
 		reconciler := &PrometheusRuleReconciler{
-			Client:  fakeClient,
-			Scheme:  testScheme,
-			Version: "0.0.1",
+			Client:    fakeClient,
+			Scheme:    testScheme,
+			Namespace: "kubevirt",
 		}
 
 		result, err := reconciler.Reconcile(ctx, reconcile.Request{})
@@ -86,12 +86,11 @@ var _ = Describe("PrometheusRule Reconciler", func() {
 
 		pr := &monitoringv1.PrometheusRule{}
 		err = fakeClient.Get(ctx, types.NamespacedName{
-			Name:      "kubevirt-observability-rules",
+			Name:      "virt-observability-rules",
 			Namespace: "kubevirt",
 		}, pr)
 		Expect(err).ToNot(HaveOccurred())
 		Expect(pr.Spec.Groups).ToNot(BeEmpty())
-		Expect(pr.Annotations).To(HaveKeyWithValue("kubevirt-observability-controller.kubevirt.io/version", "0.0.1"))
 	})
 
 	It("should update PrometheusRule when it already exists but differs", func() {
@@ -99,7 +98,7 @@ var _ = Describe("PrometheusRule Reconciler", func() {
 
 		stale := &monitoringv1.PrometheusRule{
 			ObjectMeta: metav1.ObjectMeta{
-				Name:      "kubevirt-observability-rules",
+				Name:      "virt-observability-rules",
 				Namespace: "kubevirt",
 			},
 			Spec: monitoringv1.PrometheusRuleSpec{},
@@ -111,9 +110,9 @@ var _ = Describe("PrometheusRule Reconciler", func() {
 			Build()
 
 		reconciler := &PrometheusRuleReconciler{
-			Client:  fakeClient,
-			Scheme:  testScheme,
-			Version: "0.0.1",
+			Client:    fakeClient,
+			Scheme:    testScheme,
+			Namespace: "kubevirt",
 		}
 
 		_, err := reconciler.Reconcile(ctx, reconcile.Request{})
@@ -121,7 +120,7 @@ var _ = Describe("PrometheusRule Reconciler", func() {
 
 		pr := &monitoringv1.PrometheusRule{}
 		err = fakeClient.Get(ctx, types.NamespacedName{
-			Name:      "kubevirt-observability-rules",
+			Name:      "virt-observability-rules",
 			Namespace: "kubevirt",
 		}, pr)
 		Expect(err).ToNot(HaveOccurred())
@@ -137,9 +136,9 @@ var _ = Describe("PrometheusRule Reconciler", func() {
 			Build()
 
 		reconciler := &PrometheusRuleReconciler{
-			Client:  fakeClient,
-			Scheme:  testScheme,
-			Version: "0.0.1",
+			Client:    fakeClient,
+			Scheme:    testScheme,
+			Namespace: "kubevirt",
 		}
 
 		_, err := reconciler.Reconcile(ctx, reconcile.Request{})
@@ -150,7 +149,7 @@ var _ = Describe("PrometheusRule Reconciler", func() {
 		Expect(result).To(Equal(reconcile.Result{}))
 	})
 
-	It("should skip reconciliation when no KubeVirt CR exists", func() {
+	It("should create PrometheusRule even when no KubeVirt CR exists", func() {
 		ctx := context.Background()
 
 		fakeClient := fake.NewClientBuilder().
@@ -158,14 +157,22 @@ var _ = Describe("PrometheusRule Reconciler", func() {
 			Build()
 
 		reconciler := &PrometheusRuleReconciler{
-			Client:  fakeClient,
-			Scheme:  testScheme,
-			Version: "0.0.1",
+			Client:    fakeClient,
+			Scheme:    testScheme,
+			Namespace: "kubevirt",
 		}
 
 		result, err := reconciler.Reconcile(ctx, reconcile.Request{})
 		Expect(err).ToNot(HaveOccurred())
 		Expect(result).To(Equal(reconcile.Result{}))
+
+		pr := &monitoringv1.PrometheusRule{}
+		err = fakeClient.Get(ctx, types.NamespacedName{
+			Name:      "virt-observability-rules",
+			Namespace: "kubevirt",
+		}, pr)
+		Expect(err).ToNot(HaveOccurred())
+		Expect(pr.Spec.Groups).ToNot(BeEmpty())
 	})
 
 	It("should create PrometheusRule with only allowlisted alerts", func() {
@@ -177,9 +184,9 @@ var _ = Describe("PrometheusRule Reconciler", func() {
 			Build()
 
 		reconciler := &PrometheusRuleReconciler{
-			Client:  fakeClient,
-			Scheme:  testScheme,
-			Version: "0.0.1",
+			Client:    fakeClient,
+			Scheme:    testScheme,
+			Namespace: "kubevirt",
 			AlertsAllowlist: map[string]bool{
 				"VirtAPIDown": true,
 			},
@@ -193,7 +200,7 @@ var _ = Describe("PrometheusRule Reconciler", func() {
 
 		pr := &monitoringv1.PrometheusRule{}
 		err = fakeClient.Get(ctx, types.NamespacedName{
-			Name:      "kubevirt-observability-rules",
+			Name:      "virt-observability-rules",
 			Namespace: "kubevirt",
 		}, pr)
 		Expect(err).ToNot(HaveOccurred())
@@ -224,7 +231,7 @@ var _ = Describe("PrometheusRule Reconciler", func() {
 		reconciler := &PrometheusRuleReconciler{
 			Client:                  fakeClient,
 			Scheme:                  testScheme,
-			Version:                 "0.0.1",
+			Namespace:               "kubevirt",
 			AlertsAllowlist:         map[string]bool{},
 			RecordingRulesAllowlist: map[string]bool{},
 		}
@@ -234,7 +241,7 @@ var _ = Describe("PrometheusRule Reconciler", func() {
 
 		pr := &monitoringv1.PrometheusRule{}
 		err = fakeClient.Get(ctx, types.NamespacedName{
-			Name:      "kubevirt-observability-rules",
+			Name:      "virt-observability-rules",
 			Namespace: "kubevirt",
 		}, pr)
 		Expect(errors.IsNotFound(err)).To(BeTrue())
@@ -245,7 +252,7 @@ var _ = Describe("PrometheusRule Reconciler", func() {
 
 		existing := &monitoringv1.PrometheusRule{
 			ObjectMeta: metav1.ObjectMeta{
-				Name:      "kubevirt-observability-rules",
+				Name:      "virt-observability-rules",
 				Namespace: "kubevirt",
 			},
 			Spec: monitoringv1.PrometheusRuleSpec{},
@@ -259,7 +266,7 @@ var _ = Describe("PrometheusRule Reconciler", func() {
 		reconciler := &PrometheusRuleReconciler{
 			Client:                  fakeClient,
 			Scheme:                  testScheme,
-			Version:                 "0.0.1",
+			Namespace:               "kubevirt",
 			AlertsAllowlist:         map[string]bool{},
 			RecordingRulesAllowlist: map[string]bool{},
 		}
@@ -269,7 +276,7 @@ var _ = Describe("PrometheusRule Reconciler", func() {
 
 		pr := &monitoringv1.PrometheusRule{}
 		err = fakeClient.Get(ctx, types.NamespacedName{
-			Name:      "kubevirt-observability-rules",
+			Name:      "virt-observability-rules",
 			Namespace: "kubevirt",
 		}, pr)
 		Expect(errors.IsNotFound(err)).To(BeTrue())

@@ -38,13 +38,13 @@ import (
 )
 
 const (
-	prometheusRuleName = "kubevirt-observability-rules"
+	prometheusRuleName = "virt-observability-rules"
 )
 
 type PrometheusRuleReconciler struct {
 	client.Client
 	Scheme                  *runtime.Scheme
-	Version                 string
+	Namespace               string
 	AlertsAllowlist         map[string]bool
 	RecordingRulesAllowlist map[string]bool
 }
@@ -52,43 +52,31 @@ type PrometheusRuleReconciler struct {
 func (r *PrometheusRuleReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	logger := log.FromContext(ctx)
 
-	kvList := &k6tv1.KubeVirtList{}
-	if err := r.List(ctx, kvList); err != nil {
-		return ctrl.Result{}, fmt.Errorf("listing KubeVirt CRs: %w", err)
-	}
-
-	if len(kvList.Items) == 0 {
-		logger.Info("No KubeVirt CR found, skipping reconciliation")
-		return ctrl.Result{}, nil
-	}
-
-	namespace := kvList.Items[0].Namespace
-
-	if err := rules.SetupRules(namespace, r.AlertsAllowlist, r.RecordingRulesAllowlist); err != nil {
+	if err := rules.SetupRules(r.Namespace, r.AlertsAllowlist, r.RecordingRulesAllowlist); err != nil {
 		return ctrl.Result{}, fmt.Errorf("setting up rules: %w", err)
 	}
 
 	existing := &monitoringv1.PrometheusRule{}
 	getErr := r.Get(ctx, types.NamespacedName{
 		Name:      prometheusRuleName,
-		Namespace: namespace,
+		Namespace: r.Namespace,
 	}, existing)
 
 	if !rules.HasRegisteredRules() {
 		if getErr == nil {
-			logger.Info("No rules registered, deleting PrometheusRule", "name", prometheusRuleName, "namespace", namespace)
+			logger.Info("No rules registered, deleting PrometheusRule", "name", prometheusRuleName, "namespace", r.Namespace)
 			return ctrl.Result{}, r.Delete(ctx, existing)
 		}
 		return ctrl.Result{}, nil
 	}
 
-	desired, err := r.buildDesiredPrometheusRule(namespace)
+	desired, err := r.buildDesiredPrometheusRule()
 	if err != nil {
 		return ctrl.Result{}, fmt.Errorf("building PrometheusRule: %w", err)
 	}
 
 	if errors.IsNotFound(getErr) {
-		logger.Info("Creating PrometheusRule", "name", prometheusRuleName, "namespace", namespace)
+		logger.Info("Creating PrometheusRule", "name", prometheusRuleName, "namespace", r.Namespace)
 		return ctrl.Result{}, r.Create(ctx, desired)
 	}
 	if getErr != nil {
@@ -96,27 +84,25 @@ func (r *PrometheusRuleReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 	}
 
 	if !equality.Semantic.DeepEqual(existing.Spec, desired.Spec) ||
-		existing.Annotations["kubevirt-observability-controller.kubevirt.io/version"] != r.Version {
+		!equality.Semantic.DeepEqual(existing.Labels, desired.Labels) ||
+		!equality.Semantic.DeepEqual(existing.Annotations, desired.Annotations) {
+
 		existing.Spec = desired.Spec
 		existing.Labels = desired.Labels
 		existing.Annotations = desired.Annotations
-		logger.Info("Updating PrometheusRule", "name", prometheusRuleName, "namespace", namespace)
+
+		logger.Info("Updating PrometheusRule", "name", prometheusRuleName, "namespace", r.Namespace)
 		return ctrl.Result{}, r.Update(ctx, existing)
 	}
 
 	return ctrl.Result{}, nil
 }
 
-func (r *PrometheusRuleReconciler) buildDesiredPrometheusRule(namespace string) (*monitoringv1.PrometheusRule, error) {
-	pr, err := rules.BuildPrometheusRule(prometheusRuleName, namespace)
+func (r *PrometheusRuleReconciler) buildDesiredPrometheusRule() (*monitoringv1.PrometheusRule, error) {
+	pr, err := rules.BuildPrometheusRule(prometheusRuleName, r.Namespace, commonLabels(labelValueComponentRules))
 	if err != nil {
 		return nil, err
 	}
-
-	if pr.Annotations == nil {
-		pr.Annotations = make(map[string]string)
-	}
-	pr.Annotations["kubevirt-observability-controller.kubevirt.io/version"] = r.Version
 
 	return pr, nil
 }

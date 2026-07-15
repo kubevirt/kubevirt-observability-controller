@@ -44,7 +44,11 @@ var _ = Describe("Rules Setup", func() {
 		err := SetupRules("kubevirt", nil, nil)
 		Expect(err).ToNot(HaveOccurred())
 
-		pr, err := BuildPrometheusRule("kubevirt-observability-rules", "kubevirt")
+		pr, err := BuildPrometheusRule(
+			"kubevirt-observability-rules",
+			"kubevirt",
+			map[string]string{"app.kubernetes.io/managed-by": "kubevirt-observability-controller"},
+		)
 		Expect(err).ToNot(HaveOccurred())
 		Expect(pr).ToNot(BeNil())
 		Expect(pr.Spec.Groups).ToNot(BeEmpty())
@@ -65,7 +69,11 @@ var _ = Describe("Rules Setup", func() {
 			err := SetupRules("kubevirt", alertsAllowlist, recordingRulesAllowlist)
 			Expect(err).ToNot(HaveOccurred())
 
-			pr, err := BuildPrometheusRule("kubevirt-observability-rules", "kubevirt")
+			pr, err := BuildPrometheusRule(
+				"kubevirt-observability-rules",
+				"kubevirt",
+				map[string]string{"app.kubernetes.io/managed-by": "kubevirt-observability-controller"},
+			)
 			Expect(err).ToNot(HaveOccurred())
 			Expect(pr).ToNot(BeNil())
 

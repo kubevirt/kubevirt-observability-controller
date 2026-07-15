@@ -44,13 +44,11 @@ func HasRegisteredRules() bool {
 	return len(registry.ListAlerts()) > 0 || len(registry.ListRecordingRules()) > 0
 }
 
-func BuildPrometheusRule(name, namespace string) (*promv1.PrometheusRule, error) {
+func BuildPrometheusRule(name, namespace string, labels map[string]string) (*promv1.PrometheusRule, error) {
 	return registry.BuildPrometheusRule(
 		name,
 		namespace,
-		map[string]string{
-			"app.kubernetes.io/managed-by": "kubevirt-observability-controller",
-		},
+		labels,
 	)
 }
 

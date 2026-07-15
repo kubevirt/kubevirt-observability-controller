@@ -63,6 +63,15 @@ rules:
 - apiGroups: [""]
   resources: ["configmaps"]
   verbs: ["get"]
+- apiGroups: [""]
+  resources: ["services"]
+  verbs: ["get", "list", "watch", "create", "update", "delete"]
+- apiGroups: [""]
+  resources: ["secrets"]
+  verbs: ["get", "list", "watch", "create", "update", "delete"]
+- apiGroups: ["monitoring.coreos.com"]
+  resources: ["servicemonitors"]
+  verbs: ["get", "list", "watch", "create", "update", "delete"]
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
@@ -108,6 +117,7 @@ spec:
     metadata:
       labels:
         app: %[1]s
+        app.kubernetes.io/name: %[1]s
         kubevirt.io: %[1]s
     spec:
       serviceAccountName: %[1]s
@@ -116,6 +126,15 @@ spec:
         image: %[3]s
         imagePullPolicy: Always
         args:%[4]s
+        env:
+        - name: POD_NAMESPACE
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.namespace
+        - name: POD_SERVICE_ACCOUNT
+          valueFrom:
+            fieldRef:
+              fieldPath: spec.serviceAccountName
         ports:
         - containerPort: 8080
           name: metrics
@@ -139,20 +158,7 @@ spec:
       - name: monitoring-client-cert
         secret:
           secretName: kubevirt-virt-handler-monitoring-client-certs
-          optional: true
----
-apiVersion: v1
-kind: Service
-metadata:
-  name: %[5]s
-  namespace: %[2]s
-spec:
-  selector:
-    app: %[1]s
-  ports:
-  - port: 8080
-    targetPort: 8080
-    name: metrics`, ControllerName, namespace, image, argsYAML, MetricsService)
+          optional: true`, ControllerName, namespace, image, argsYAML)
 }
 
 func DeployController(namespace, image string, extraArgs ...string) error {

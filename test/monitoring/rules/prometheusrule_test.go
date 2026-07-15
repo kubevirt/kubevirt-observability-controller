@@ -28,7 +28,7 @@ import (
 	"github.com/kubevirt/kubevirt-observability-controller/test/monitoring/rules"
 )
 
-const prometheusRuleName = "kubevirt-observability-rules"
+const prometheusRuleName = "virt-observability-rules"
 
 var _ = Describe("PrometheusRule Reconciliation", func() {
 	It("should create the PrometheusRule", func() {
@@ -42,7 +42,7 @@ var _ = Describe("PrometheusRule Reconciliation", func() {
 		pr, err := rules.GetPrometheusRule(kvNamespace, prometheusRuleName)
 		Expect(err).ToNot(HaveOccurred())
 		Expect(pr.Labels).To(HaveKeyWithValue(
-			"app.kubernetes.io/managed-by", "kubevirt-observability-controller"))
+			"app.kubernetes.io/managed-by", "virt-observability-controller"))
 	})
 
 	It("should contain alerts", func() {

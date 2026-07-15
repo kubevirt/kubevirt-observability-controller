@@ -54,10 +54,17 @@ spec:
         args:
           - --leader-elect
           - --health-probe-bind-address=:8081
-          - --enable-vmstats
-          - --vmstats-cert-path=/etc/monitoring/clientcertificates
         image: controller:latest
         name: manager
+        env:
+        - name: POD_NAMESPACE
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.namespace
+        - name: POD_SERVICE_ACCOUNT
+          valueFrom:
+            fieldRef:
+              fieldPath: spec.serviceAccountName
         ports: []
         securityContext:
           allowPrivilegeEscalation: false

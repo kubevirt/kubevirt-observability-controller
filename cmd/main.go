@@ -23,9 +23,11 @@ import (
 	"crypto/tls"
 	"flag"
 	"fmt"
+	"net"
 	"net/http"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"time"
 
@@ -82,7 +84,7 @@ func main() {
 	var recordingRulesAllowlistRaw string
 	var tlsOpts []func(*tls.Config)
 	flag.StringVar(&metricsAddr, "metrics-bind-address", ":8080", "The address the metrics endpoint binds to. "+
-		"Use :8443 for HTTPS or :8080 for HTTP, or set to 0 to disable the metrics service.")
+		"Use :8443 for HTTPS or :8080 for HTTP.")
 	flag.StringVar(&probeAddr, "health-probe-bind-address", ":8081", "The address the probe endpoint binds to.")
 	flag.BoolVar(&enableLeaderElection, "leader-elect", false,
 		"Enable leader election for controller manager. "+
@@ -260,10 +262,41 @@ func main() {
 		os.Exit(1)
 	}
 
+	podNamespace := getPodNamespace()
+	serviceAccountName := os.Getenv("POD_SERVICE_ACCOUNT")
+
+	if podNamespace == "" {
+		setupLog.Error(fmt.Errorf("POD_NAMESPACE not set"), "missing required environment variable")
+		os.Exit(1)
+	}
+
+	if serviceAccountName == "" {
+		setupLog.Error(fmt.Errorf("POD_SERVICE_ACCOUNT not set"), "missing required environment variable")
+		os.Exit(1)
+	}
+
+	metricsPort, err := parseMetricsPort(metricsAddr)
+	if err != nil {
+		setupLog.Error(err, "unable to parse metrics port")
+		os.Exit(1)
+	}
+
+	if err := (&controller.MetricsResourcesReconciler{
+		Client:             mgr.GetClient(),
+		Scheme:             mgr.GetScheme(),
+		Namespace:          podNamespace,
+		ServiceAccountName: serviceAccountName,
+		MetricsPort:        metricsPort,
+		SecureMetrics:      secureMetrics,
+	}).SetupWithManager(mgr); err != nil {
+		setupLog.Error(err, "unable to create controller", "controller", "MetricsResources")
+		os.Exit(1)
+	}
+
 	if err := (&controller.PrometheusRuleReconciler{
 		Client:                  mgr.GetClient(),
 		Scheme:                  mgr.GetScheme(),
-		Version:                 "0.0.1",
+		Namespace:               podNamespace,
 		AlertsAllowlist:         alertsAllowlist,
 		RecordingRulesAllowlist: recordingRulesAllowlist,
 	}).SetupWithManager(mgr); err != nil {
@@ -390,6 +423,32 @@ func setupVMStats(
 		setupLog.Error(err, "unable to add vmstats poller")
 		os.Exit(1)
 	}
+}
+
+func getPodNamespace() string {
+	if ns := os.Getenv("POD_NAMESPACE"); ns != "" {
+		return ns
+	}
+
+	if data, err := os.ReadFile("/var/run/secrets/kubernetes.io/serviceaccount/namespace"); err == nil {
+		return strings.TrimSpace(string(data))
+	}
+
+	return ""
+}
+
+func parseMetricsPort(addr string) (int32, error) {
+	_, portStr, err := net.SplitHostPort(addr)
+	if err != nil {
+		return 0, fmt.Errorf("parsing metrics-bind-address %q: %w", addr, err)
+	}
+
+	port, err := strconv.ParseInt(portStr, 10, 32)
+	if err != nil {
+		return 0, fmt.Errorf("parsing metrics port %q: %w", portStr, err)
+	}
+
+	return int32(port), nil
 }
 
 func parseAllowlist(raw string) map[string]bool {
