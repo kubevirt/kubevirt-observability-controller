@@ -31,6 +31,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/utils/ptr"
+	k6tv1 "kubevirt.io/api/core/v1"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
@@ -246,6 +247,11 @@ func (r *MetricsResourcesReconciler) SetupWithManager(mgr ctrl.Manager) error {
 
 	return ctrl.NewControllerManagedBy(mgr).
 		Named("metricsresources").
+		Watches(&k6tv1.KubeVirt{}, handler.EnqueueRequestsFromMapFunc(
+			func(ctx context.Context, obj client.Object) []reconcile.Request {
+				return []reconcile.Request{{}}
+			},
+		)).
 		Watches(&corev1.Service{}, mapIfOwned(metricsServiceName)).
 		Watches(&corev1.Secret{}, mapIfOwned(metricsTokenSecretName)).
 		Watches(&monitoringv1.ServiceMonitor{}, mapIfOwned(metricsServiceMonitorName)).
