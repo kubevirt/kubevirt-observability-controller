@@ -58,6 +58,9 @@ The controller accepts the following flags (set via the Deployment's `args`):
 | `--health-probe-bind-address` | `:8081` | Address the health probe endpoint binds to |
 | `--leader-elect` | `false` | Enable leader election for HA deployments |
 | `--enable-http2` | `false` | Enable HTTP/2 for metrics and webhook servers |
+| `--tls-security-profile` | `""` | TLS security profile for the metrics server: `Old`, `Intermediate`, `Modern`, or `Custom` |
+| `--tls-min-version` | `""` | Minimum TLS version (e.g., `VersionTLS12`). Only valid with `--tls-security-profile=Custom` |
+| `--tls-ciphers` | `""` | Comma-separated OpenSSL cipher names. Only valid with `--tls-security-profile=Custom` |
 | `--metrics-allowlist` | `""` | Comma-separated list of metrics to expose (empty = all) |
 | `--alerts-allowlist` | `""` | Comma-separated list of alerts to include in the PrometheusRule (empty = all) |
 | `--recording-rules-allowlist` | `""` | Comma-separated list of recording rules to include (empty = all) |

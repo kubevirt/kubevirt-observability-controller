@@ -47,6 +47,7 @@ import (
 	"github.com/kubevirt/kubevirt-observability-controller/pkg/controller"
 	"github.com/kubevirt/kubevirt-observability-controller/pkg/monitoring/metrics"
 	"github.com/kubevirt/kubevirt-observability-controller/pkg/monitoring/metrics/vmstats"
+	"github.com/kubevirt/kubevirt-observability-controller/pkg/tlsutil"
 	"sigs.k8s.io/controller-runtime/pkg/certwatcher"
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
@@ -82,6 +83,9 @@ func main() {
 	var metricsAllowlist string
 	var alertsAllowlistRaw string
 	var recordingRulesAllowlistRaw string
+	var tlsSecurityProfile string
+	var tlsMinVersion string
+	var tlsCiphers string
 	var tlsOpts []func(*tls.Config)
 	flag.StringVar(&metricsAddr, "metrics-bind-address", ":8080", "The address the metrics endpoint binds to. "+
 		"Use :8443 for HTTPS or :8080 for HTTP.")
@@ -100,6 +104,15 @@ func main() {
 	flag.StringVar(&metricsCertKey, "metrics-cert-key", "tls.key", "The name of the metrics server key file.")
 	flag.BoolVar(&enableHTTP2, "enable-http2", false,
 		"If set, HTTP/2 will be enabled for the metrics and webhook servers")
+	flag.StringVar(&tlsSecurityProfile, "tls-security-profile", "",
+		"TLS security profile for the metrics server: Old, Intermediate, Modern, or Custom. "+
+			"Empty (default) preserves current behavior.")
+	flag.StringVar(&tlsMinVersion, "tls-min-version", "",
+		"Minimum TLS version (e.g. VersionTLS12, VersionTLS13). "+
+			"Only valid with --tls-security-profile=Custom.")
+	flag.StringVar(&tlsCiphers, "tls-ciphers", "",
+		"Comma-separated list of OpenSSL cipher names. "+
+			"Only valid with --tls-security-profile=Custom.")
 	flag.StringVar(&metricsAllowlist, "metrics-allowlist", "",
 		"Comma-separated list of metric names to expose. Empty (default) exposes all. \"none\" disables all custom metrics.")
 	flag.StringVar(&alertsAllowlistRaw, "alerts-allowlist", "",
@@ -142,6 +155,16 @@ func main() {
 		tlsOpts = append(tlsOpts, disableHTTP2)
 	}
 
+	if tlsSecurityProfile == "" && (tlsMinVersion != "" || tlsCiphers != "") {
+		setupLog.Error(
+			fmt.Errorf(
+				"--tls-min-version and --tls-ciphers are only valid "+
+					"with --tls-security-profile=Custom"),
+			"invalid flag combination",
+		)
+		os.Exit(1)
+	}
+
 	// Create watchers for metrics and webhooks certificates
 	var metricsCertWatcher, webhookCertWatcher *certwatcher.CertWatcher
 
@@ -179,6 +202,19 @@ func main() {
 		BindAddress:   metricsAddr,
 		SecureServing: secureMetrics,
 		TLSOpts:       tlsOpts,
+	}
+
+	if tlsSecurityProfile != "" {
+		tlsConfigFn, err := tlsutil.TLSSecurityProfileToTLSConfig(
+			tlsSecurityProfile, tlsMinVersion, tlsCiphers,
+		)
+		if err != nil {
+			setupLog.Error(err, "invalid TLS security profile configuration")
+			os.Exit(1)
+		}
+		metricsServerOptions.TLSOpts = append(metricsServerOptions.TLSOpts, tlsConfigFn)
+		setupLog.Info("TLS security profile configured",
+			"profile", tlsSecurityProfile)
 	}
 
 	if secureMetrics {
