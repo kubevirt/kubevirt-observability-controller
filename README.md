@@ -1,121 +1,93 @@
 # kubevirt-observability-controller
-// TODO(user): Add simple overview of use/purpose
 
-## Description
-// TODO(user): An in-depth paragraph about your project and overview of use
+A Kubernetes controller that externalizes KubeVirt monitoring, metrics,
+recording rules, and alerts, into a standalone operator, decoupled from the main
+KubeVirt deployment.
 
-## Getting Started
+## Overview
 
-### Prerequisites
-- go version v1.24.0+
-- docker version 17.03+.
-- kubectl version v1.11.3+.
-- Access to a Kubernetes v1.11.3+ cluster.
+The controller watches KubeVirt resources (VirtualMachine,
+VirtualMachineInstance, migrations, instance types) and exposes Prometheus
+metrics about them. It also reconciles Prometheus Operator resources
+(PrometheusRule, ServiceMonitor) so Prometheus can scrape those metrics and
+evaluate alerting/recording rules.
 
-### To Deploy on the cluster
-**Build and push your image to the location specified by `IMG`:**
+## Prerequisites
 
-```sh
-make docker-build docker-push IMG=<some-registry>/kubevirt-observability-controller:tag
-```
+- Kubernetes cluster (v1.26+) with KubeVirt installed
+- `kubectl` configured to access the cluster
+- Container build tool (`docker` or `podman`)
+- prometheus-operator CRDs installed (for PrometheusRule and ServiceMonitor)
 
-**NOTE:** This image ought to be published in the personal registry you specified.
-And it is required to have access to pull the image from the working environment.
-Make sure you have the proper permission to the registry if the above commands don’t work.
+## Quick Start
 
-**Install the CRDs into the cluster:**
+Build and push the image:
 
 ```sh
-make install
+IMG=<your-registry>/virt-observability-controller:latest
+make docker-build docker-push IMG=$IMG
 ```
 
-**Deploy the Manager to the cluster with the image specified by `IMG`:**
+Deploy to the cluster:
 
 ```sh
-make deploy IMG=<some-registry>/kubevirt-observability-controller:tag
+make deploy IMG=$IMG
 ```
 
-> **NOTE**: If you encounter RBAC errors, you may need to grant yourself cluster-admin
-privileges or be logged in as admin.
+For detailed deployment options, configuration flags, and verification steps, see [docs/deployment.md](docs/deployment.md).
 
-**Create instances of your solution**
-You can apply the samples (examples) from the config/sample:
+## Documentation
+
+- [Deployment Guide](docs/deployment.md) — build, deploy, configure, and verify
+- [Metrics Reference](docs/metrics.md) — full list of exposed metrics and recording rules
+- [Running E2E Tests](docs/running-e2e-tests.md) — how to run end-to-end tests with kubevirtci
+
+## Development
+
+### Build
 
 ```sh
-kubectl apply -k config/samples/
+make build
 ```
 
->**NOTE**: Ensure that the samples has default values to test it out.
-
-### To Uninstall
-**Delete the instances (CRs) from the cluster:**
+### Run Tests
 
 ```sh
-kubectl delete -k config/samples/
+make test        # unit tests
+make test-e2e    # end-to-end tests (requires kubevirtci cluster)
 ```
 
-**Delete the APIs(CRDs) from the cluster:**
+### Lint
 
 ```sh
-make uninstall
+make lint
+make lint-fix
 ```
 
-**UnDeploy the controller from the cluster:**
+### Generate
+
+```sh
+make manifests   # regenerate RBAC manifests
+make generate    # regenerate deepcopy and metrics docs
+```
+
+## Uninstall
+
+If deployed with kustomize:
 
 ```sh
 make undeploy
 ```
 
-## Project Distribution
-
-Following the options to release and provide this solution to the users.
-
-### By providing a bundle with all YAML files
-
-1. Build the installer for the image built and published in the registry:
+If deployed with a static manifest:
 
 ```sh
-make build-installer IMG=<some-registry>/kubevirt-observability-controller:tag
+kubectl delete -f dist/install.yaml
 ```
-
-**NOTE:** The makefile target mentioned above generates an 'install.yaml'
-file in the dist directory. This file contains all the resources built
-with Kustomize, which are necessary to install this project without its
-dependencies.
-
-2. Using the installer
-
-Users can just run 'kubectl apply -f <URL for YAML BUNDLE>' to install
-the project, i.e.:
-
-```sh
-kubectl apply -f https://raw.githubusercontent.com/<org>/kubevirt-observability-controller/<tag or branch>/dist/install.yaml
-```
-
-### By providing a Helm Chart
-
-1. Build the chart using the optional helm plugin
-
-```sh
-operator-sdk edit --plugins=helm/v1-alpha
-```
-
-2. See that a chart was generated under 'dist/chart', and users
-can obtain this solution from there.
-
-**NOTE:** If you change the project, you need to update the Helm Chart
-using the same command above to sync the latest changes. Furthermore,
-if you create webhooks, you need to use the above command with
-the '--force' flag and manually ensure that any custom configuration
-previously added to 'dist/chart/values.yaml' or 'dist/chart/manager/manager.yaml'
-is manually re-applied afterwards.
 
 ## Contributing
-// TODO(user): Add detailed information on how you would like others to contribute to this project
 
-**NOTE:** Run `make help` for more information on all potential `make` targets
-
-More information can be found via the [Kubebuilder Documentation](https://book.kubebuilder.io/introduction.html)
+Run `make help` for the full list of available `make` targets.
 
 ## License
 
@@ -132,4 +104,3 @@ distributed under the License is distributed on an "AS IS" BASIS,
 WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
-
