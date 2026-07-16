@@ -5,6 +5,8 @@ go 1.25.0
 require (
 	github.com/onsi/ginkgo/v2 v2.27.2
 	github.com/onsi/gomega v1.38.2
+	github.com/openshift/api v0.0.0-20260105114749-aae5635a71a7
+	github.com/openshift/library-go v0.0.0-20240830130947-d9523164b328
 	github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring v0.90.1
 	github.com/rhobs/operator-observability-toolkit v0.0.30
 	k8s.io/api v0.35.2
