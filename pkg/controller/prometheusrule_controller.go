@@ -65,8 +65,17 @@ func (r *PrometheusRuleReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 	if !rules.HasRegisteredRules() {
 		if getErr == nil {
 			logger.Info("No rules registered, deleting PrometheusRule", "name", prometheusRuleName, "namespace", r.Namespace)
-			return ctrl.Result{}, r.Delete(ctx, existing)
+			if err := r.Delete(ctx, existing); err != nil && !errors.IsNotFound(err) {
+				return ctrl.Result{}, err
+			}
+
+			return ctrl.Result{}, nil
 		}
+
+		if !errors.IsNotFound(getErr) {
+			return ctrl.Result{}, getErr
+		}
+
 		return ctrl.Result{}, nil
 	}
 
@@ -109,10 +118,28 @@ func (r *PrometheusRuleReconciler) buildDesiredPrometheusRule() (*monitoringv1.P
 
 func (r *PrometheusRuleReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
-		For(&monitoringv1.PrometheusRule{}).
+		Named("prometheusrule").
+		Watches(&monitoringv1.PrometheusRule{}, handler.EnqueueRequestsFromMapFunc(
+			func(ctx context.Context, obj client.Object) []reconcile.Request {
+				if obj.GetNamespace() != r.Namespace || obj.GetName() != prometheusRuleName {
+					return nil
+				}
+				return []reconcile.Request{{
+					NamespacedName: types.NamespacedName{
+						Namespace: r.Namespace,
+						Name:      prometheusRuleName,
+					},
+				}}
+			},
+		)).
 		Watches(&k6tv1.KubeVirt{}, handler.EnqueueRequestsFromMapFunc(
 			func(ctx context.Context, obj client.Object) []reconcile.Request {
-				return []reconcile.Request{{}}
+				return []reconcile.Request{{
+					NamespacedName: types.NamespacedName{
+						Namespace: r.Namespace,
+						Name:      prometheusRuleName,
+					},
+				}}
 			},
 		)).
 		Complete(r)

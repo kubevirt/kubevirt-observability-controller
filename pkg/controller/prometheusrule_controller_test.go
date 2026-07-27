@@ -32,7 +32,9 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	k6tv1 "kubevirt.io/api/core/v1"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
+	"sigs.k8s.io/controller-runtime/pkg/client/interceptor"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	"github.com/kubevirt/kubevirt-observability-controller/pkg/monitoring/rules"
@@ -245,6 +247,49 @@ var _ = Describe("PrometheusRule Reconciler", func() {
 			Namespace: "kubevirt",
 		}, pr)
 		Expect(errors.IsNotFound(err)).To(BeTrue())
+	})
+
+	It("should return AlreadyExists error when cache is stale so controller-runtime retries with backoff", func() {
+		ctx := context.Background()
+
+		existing := &monitoringv1.PrometheusRule{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "virt-observability-rules",
+				Namespace: "kubevirt",
+			},
+			Spec: monitoringv1.PrometheusRuleSpec{},
+		}
+
+		underlying := fake.NewClientBuilder().
+			WithScheme(testScheme).
+			WithObjects(newKubeVirt(), existing).
+			Build()
+
+		staleClient := interceptor.NewClient(underlying, interceptor.Funcs{
+			Get: func(
+				ctx context.Context,
+				c client.WithWatch,
+				key client.ObjectKey,
+				obj client.Object,
+				opts ...client.GetOption,
+			) error {
+				if key.Name == "virt-observability-rules" {
+					return errors.NewNotFound(
+						monitoringv1.Resource("prometheusrules"), key.Name,
+					)
+				}
+				return c.Get(ctx, key, obj, opts...)
+			},
+		})
+
+		reconciler := &PrometheusRuleReconciler{
+			Client:    staleClient,
+			Scheme:    testScheme,
+			Namespace: "kubevirt",
+		}
+
+		_, err := reconciler.Reconcile(ctx, reconcile.Request{})
+		Expect(errors.IsAlreadyExists(err)).To(BeTrue())
 	})
 
 	It("should delete existing PrometheusRule when both allowlists become empty", func() {
