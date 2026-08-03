@@ -156,7 +156,6 @@ func ReportVMIsStats(
 		crs = append(crs, CollectVMIMigrationTime(vmi)...)
 		crs = append(crs, CollectVMIsVnicInfo(vmi)...)
 		crs = append(crs, collectVMILauncherMemoryOverhead(vmi))
-		crs = append(crs, CollectVMIEphemeralHotplug(vmi)...)
 	}
 
 	return crs
@@ -411,20 +410,4 @@ func CollectVMIsVnicInfo(
 	}
 
 	return results
-}
-
-func CollectVMIEphemeralHotplug(
-	vmi *k6tv1.VirtualMachineInstance,
-) []operatormetrics.CollectorResult {
-	annotations := vmi.GetAnnotations()
-	volumeName, exists := annotations[k6tv1.EphemeralHotplugAnnotation]
-	if !exists {
-		return nil
-	}
-
-	return []operatormetrics.CollectorResult{{
-		Metric: vmiEphemeralHotplugVolume,
-		Labels: []string{vmi.Namespace, vmi.Name, volumeName},
-		Value:  1,
-	}}
 }

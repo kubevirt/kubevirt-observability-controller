@@ -218,30 +218,4 @@ var _ = Describe("VMI Stats Collector", func() {
 			Expect(result.Value).To(Equal(float64(0)))
 		})
 	})
-
-	Describe("CollectVMIEphemeralHotplug", func() {
-		It("should report when annotation present", func() {
-			vmi := &k6tv1.VirtualMachineInstance{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "vmi1",
-					Namespace: "ns1",
-					Annotations: map[string]string{
-						k6tv1.EphemeralHotplugAnnotation: "temp-vol",
-					},
-				},
-			}
-
-			results := CollectVMIEphemeralHotplug(vmi)
-			Expect(results).To(HaveLen(1))
-			Expect(results[0].Labels[2]).To(Equal("temp-vol"))
-		})
-
-		It("should return nil when no annotation", func() {
-			vmi := &k6tv1.VirtualMachineInstance{
-				ObjectMeta: metav1.ObjectMeta{Name: "vmi1", Namespace: "ns1"},
-			}
-
-			Expect(CollectVMIEphemeralHotplug(vmi)).To(BeNil())
-		})
-	})
 })
