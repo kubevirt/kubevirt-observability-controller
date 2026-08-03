@@ -114,7 +114,7 @@ vet: ## Run go vet against code.
 	go vet ./...
 
 .PHONY: test
-test: manifests generate fmt vet setup-envtest ## Run tests.
+test: manifests generate fmt goimports-check vet setup-envtest ## Run tests.
 	KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) --bin-dir $(LOCALBIN) -p path)" go test $$(go list ./... | grep -v /e2e | grep -v /test/ | grep -v /cmd) -coverprofile cover.out
 
 .PHONY: test-e2e
@@ -141,6 +141,11 @@ lint-config: golangci-lint ## Verify golangci-lint linter configuration
 .PHONY: vulncheck
 vulncheck: govulncheck ## Run govulncheck to check for known vulnerabilities in dependencies
 	$(GOVULNCHECK) ./...
+
+.PHONY: goimports-check
+goimports-check: goimports ## Check that all Go files are properly formatted with goimports
+	$(GOIMPORTS) -w -local="github.com/kubevirt/kubevirt-observability-controller" $(shell find . -type f -name '*.go' ! -path "./vendor/*" ! -path "*/_kubevirt/*")
+
 
 ##@ Build
 
@@ -213,6 +218,7 @@ CONTROLLER_GEN ?= $(LOCALBIN)/controller-gen
 ENVTEST ?= $(LOCALBIN)/setup-envtest
 GOLANGCI_LINT = $(LOCALBIN)/golangci-lint
 GOVULNCHECK ?= $(LOCALBIN)/govulncheck
+GOIMPORTS ?= $(LOCALBIN)/goimports
 
 ## Tool Versions
 KUSTOMIZE_VERSION ?= v5.6.0
@@ -223,6 +229,7 @@ ENVTEST_VERSION ?= $(shell go list -m -f "{{ .Version }}" sigs.k8s.io/controller
 ENVTEST_K8S_VERSION ?= $(shell go list -m -f "{{ .Version }}" k8s.io/api | awk -F'[v.]' '{printf "1.%d", $$3}')
 GOLANGCI_LINT_VERSION ?= v2.11.4
 GOVULNCHECK_VERSION ?= v1.6.0
+GOIMPORTS_VERSION ?= v0.33.0
 
 .PHONY: kustomize
 kustomize: $(KUSTOMIZE) ## Download kustomize locally if necessary.
@@ -256,6 +263,11 @@ $(GOLANGCI_LINT): $(LOCALBIN)
 govulncheck: $(GOVULNCHECK) ## Download govulncheck locally if necessary.
 $(GOVULNCHECK): $(LOCALBIN)
 	$(call go-install-tool,$(GOVULNCHECK),golang.org/x/vuln/cmd/govulncheck,$(GOVULNCHECK_VERSION))
+
+.PHONY: goimports
+goimports: $(GOIMPORTS) ## Download goimports locally if necessary.
+$(GOIMPORTS): $(LOCALBIN)
+	$(call go-install-tool,$(GOIMPORTS),golang.org/x/tools/cmd/goimports,$(GOIMPORTS_VERSION))
 
 # go-install-tool will 'go install' any package with custom target and name of binary, if it doesn't exist
 # $1 - target path with name of binary
