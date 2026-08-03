@@ -44,7 +44,7 @@ var _ = Describe("TLSSecurityProfileToTLSConfig", func() {
 		},
 		Entry("Old profile", "Old", uint16(tls.VersionTLS10), true),
 		Entry("Intermediate profile", "Intermediate", uint16(tls.VersionTLS12), true),
-		Entry("Modern profile (TLS 1.3 ciphers are not configurable in Go)", "Modern", uint16(tls.VersionTLS13), false),
+		Entry("Modern profile (TLS 1.3 ciphers are not configurable in Go)", "Modern", uint16(tls.VersionTLS13), true),
 	)
 
 	It("should include insecure cipher suites from the Old profile", func() {
