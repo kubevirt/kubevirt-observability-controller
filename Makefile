@@ -144,7 +144,12 @@ vulncheck: govulncheck ## Run govulncheck to check for known vulnerabilities in 
 
 .PHONY: goimports-check
 goimports-check: goimports ## Check that all Go files are properly formatted with goimports
-	$(GOIMPORTS) -w -local="github.com/kubevirt/kubevirt-observability-controller" $(shell find . -type f -name '*.go' ! -path "./vendor/*" ! -path "*/_kubevirt/*")
+	@out=$$($(GOIMPORTS) -w -l -local="github.com/kubevirt/kubevirt-observability-controller" $(shell find . -type f -name '*.go' ! -path "./vendor/*" ! -path "*/_kubevirt/*")); \
+	if [ -n "$$out" ]; then \
+		echo "goimports fixed the following files, please commit the result:"; \
+		echo "$$out"; \
+		exit 1; \
+	fi
 
 
 ##@ Build
