@@ -19,13 +19,13 @@ Copyright The KubeVirt Authors.
 package vmstats
 
 import (
+	"bytes"
 	"context"
 	"crypto/tls"
 	"crypto/x509"
 	"encoding/json"
 	"fmt"
 	"net/http"
-	"strings"
 	"time"
 )
 
@@ -42,29 +42,56 @@ func NewVMStatsClient(httpClient *http.Client, port int) *VMStatsClient {
 	return &VMStatsClient{httpClient: httpClient, port: port}
 }
 
-var defaultQueryParams = []string{
-	"domainStats",
-	"dirtyRate",
-	"guestGetOsInfo",
-	"guestGetHostName",
-	"guestGetTimezone",
-	"guestGetUsers",
-	"guestGetDiskStats",
-	"guestNetworkGetInterfaces",
+type statsCategory struct{}
+
+var enabled = &statsCategory{}
+
+type VMStatsRequest struct {
+	DomainStats               *statsCategory `json:"domainStats,omitempty"`
+	DirtyRate                 *statsCategory `json:"dirtyRate,omitempty"`
+	GuestGetLoad              *statsCategory `json:"guestGetLoad,omitempty"`
+	GuestGetCpuStats          *statsCategory `json:"guestGetCpuStats,omitempty"`
+	GuestGetDiskStats         *statsCategory `json:"guestGetDiskStats,omitempty"`
+	GuestGetFsInfo            *statsCategory `json:"guestGetFsInfo,omitempty"`
+	GuestGetTime              *statsCategory `json:"guestGetTime,omitempty"`
+	GuestGetVcpus             *statsCategory `json:"guestGetVcpus,omitempty"`
+	GuestGetMemoryBlockInfo   *statsCategory `json:"guestGetMemoryBlockInfo,omitempty"`
+	GuestGetUsers             *statsCategory `json:"guestGetUsers,omitempty"`
+	GuestGetOsInfo            *statsCategory `json:"guestGetOsInfo,omitempty"`
+	GuestGetDisks             *statsCategory `json:"guestGetDisks,omitempty"`
+	GuestGetHostName          *statsCategory `json:"guestGetHostName,omitempty"`
+	GuestGetTimezone          *statsCategory `json:"guestGetTimezone,omitempty"`
+	GuestNetworkGetRoute      *statsCategory `json:"guestNetworkGetRoute,omitempty"`
+	GuestNetworkGetInterfaces *statsCategory `json:"guestNetworkGetInterfaces,omitempty"`
+	GuestGetMemoryBlocks      *statsCategory `json:"guestGetMemoryBlocks,omitempty"`
 }
 
-func (c *VMStatsClient) FetchNodeVMStats(ctx context.Context, podIP string) (map[string]*VMStatsResult, error) {
+type vmStatsRequestBody struct {
+	VMIs map[string]*VMStatsRequest `json:"vmis"`
+}
+
+func (c *VMStatsClient) FetchNodeVMStats(
+	ctx context.Context, podIP string, requests map[string]*VMStatsRequest,
+) (map[string]*VMStatsResult, error) {
 	baseURL := c.baseURLOverride
 	if baseURL == "" {
 		baseURL = fmt.Sprintf("https://%s:%d", podIP, c.port)
 	}
-	url := fmt.Sprintf("%s/v1/vmstats?%s", baseURL, buildQueryString(defaultQueryParams))
+	url := fmt.Sprintf("%s/v1/vmstats", baseURL)
 
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+	reqBody := vmStatsRequestBody{VMIs: requests}
+
+	payload, err := json.Marshal(reqBody)
+	if err != nil {
+		return nil, fmt.Errorf("encoding request: %w", err)
+	}
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewReader(payload))
 	if err != nil {
 		return nil, fmt.Errorf("building request: %w", err)
 	}
 	req.Header.Set("Accept", "application/json")
+	req.Header.Set("Content-Type", "application/json")
 
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
@@ -81,14 +108,6 @@ func (c *VMStatsClient) FetchNodeVMStats(ctx context.Context, podIP string) (map
 		return nil, fmt.Errorf("decoding response: %w", err)
 	}
 	return results, nil
-}
-
-func buildQueryString(params []string) string {
-	parts := make([]string, 0, len(params))
-	for _, p := range params {
-		parts = append(parts, p+"=true")
-	}
-	return strings.Join(parts, "&")
 }
 
 func NewTLSConfigFromCA(caData []byte) (*tls.Config, error) {
