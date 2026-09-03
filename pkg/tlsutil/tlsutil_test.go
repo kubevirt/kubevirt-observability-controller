@@ -28,7 +28,7 @@ import (
 var _ = Describe("TLSSecurityProfileToTLSConfig", func() {
 	DescribeTable("named profiles set MinVersion and CipherSuites",
 		func(profileType string, expectedMinVersion uint16, expectCiphers bool) {
-			fn, err := TLSSecurityProfileToTLSConfig(profileType, "", "")
+			fn, err := TLSSecurityProfileToTLSConfig(profileType, "", "", "", GinkgoLogr)
 			Expect(err).ToNot(HaveOccurred())
 			Expect(fn).ToNot(BeNil())
 
@@ -48,7 +48,7 @@ var _ = Describe("TLSSecurityProfileToTLSConfig", func() {
 	)
 
 	It("should include insecure cipher suites from the Old profile", func() {
-		fn, err := TLSSecurityProfileToTLSConfig("Old", "", "")
+		fn, err := TLSSecurityProfileToTLSConfig("Old", "", "", "", GinkgoLogr)
 		Expect(err).ToNot(HaveOccurred())
 
 		cfg := &tls.Config{}
@@ -58,11 +58,13 @@ var _ = Describe("TLSSecurityProfileToTLSConfig", func() {
 		Expect(cfg.CipherSuites).To(ContainElement(tls.TLS_RSA_WITH_3DES_EDE_CBC_SHA))
 	})
 
-	It("should configure Custom profile with valid min version and ciphers", func() {
+	It("should configure Custom profile with valid min version, ciphers and groups", func() {
 		fn, err := TLSSecurityProfileToTLSConfig(
 			"Custom",
 			"VersionTLS12",
 			"ECDHE-RSA-AES128-GCM-SHA256,ECDHE-RSA-AES256-GCM-SHA384",
+			"X25519MLKEM768,X25519",
+			GinkgoLogr,
 		)
 		Expect(err).ToNot(HaveOccurred())
 		Expect(fn).ToNot(BeNil())
@@ -75,13 +77,19 @@ var _ = Describe("TLSSecurityProfileToTLSConfig", func() {
 			tls.TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256,
 			tls.TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384,
 		))
+		Expect(cfg.CurvePreferences).To(ConsistOf(
+			tls.X25519,
+			tls.X25519MLKEM768,
+		))
 	})
 
-	It("should trim whitespace from cipher names", func() {
+	It("should trim whitespace from cipher and group names", func() {
 		fn, err := TLSSecurityProfileToTLSConfig(
 			"Custom",
 			"VersionTLS12",
 			" ECDHE-RSA-AES128-GCM-SHA256 , ECDHE-RSA-AES256-GCM-SHA384 ",
+			" X25519MLKEM768 , X25519 ",
+			GinkgoLogr,
 		)
 		Expect(err).ToNot(HaveOccurred())
 
@@ -92,6 +100,11 @@ var _ = Describe("TLSSecurityProfileToTLSConfig", func() {
 			tls.TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256,
 			tls.TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384,
 		))
+
+		Expect(cfg.CurvePreferences).To(ConsistOf(
+			tls.X25519,
+			tls.X25519MLKEM768,
+		))
 	})
 
 	It("should skip unknown ciphers and succeed if some are valid", func() {
@@ -99,6 +112,8 @@ var _ = Describe("TLSSecurityProfileToTLSConfig", func() {
 			"Custom",
 			"VersionTLS12",
 			"ECDHE-RSA-AES128-GCM-SHA256,UNKNOWN-CIPHER",
+			"X25519MLKEM768,UNKNOWN-GROUP",
+			GinkgoLogr,
 		)
 		Expect(err).ToNot(HaveOccurred())
 
@@ -108,57 +123,92 @@ var _ = Describe("TLSSecurityProfileToTLSConfig", func() {
 		Expect(cfg.CipherSuites).To(ConsistOf(
 			tls.TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256,
 		))
+		Expect(cfg.CurvePreferences).To(ConsistOf(
+			tls.X25519MLKEM768,
+		))
 	})
 
 	It("should return error when all ciphers are invalid", func() {
-		_, err := TLSSecurityProfileToTLSConfig(
+		Expect(TLSSecurityProfileToTLSConfig(
 			"Custom",
 			"VersionTLS12",
 			"UNKNOWN-CIPHER-1,UNKNOWN-CIPHER-2",
-		)
-		Expect(err).To(HaveOccurred())
-		Expect(err.Error()).To(ContainSubstring("no valid ciphers"))
+			"X25519MLKEM768,X25519",
+			GinkgoLogr,
+		)).Error().To(MatchError(ContainSubstring("no valid ciphers")))
+	})
+
+	It("should return error when all groups are invalid", func() {
+		Expect(TLSSecurityProfileToTLSConfig(
+			"Custom",
+			"VersionTLS12",
+			"ECDHE-RSA-AES128-GCM-SHA256,ECDHE-RSA-AES256-GCM-SHA384",
+			"UNKNOWN-GROUP-1,UNKNOWN-GROUP-2",
+			GinkgoLogr,
+		)).Error().To(MatchError(ContainSubstring("no valid groups")))
 	})
 
 	It("should return error when named profile has --tls-min-version set", func() {
-		_, err := TLSSecurityProfileToTLSConfig("Intermediate", "VersionTLS13", "")
-		Expect(err).To(HaveOccurred())
-		Expect(err.Error()).To(ContainSubstring("only valid with"))
+		Expect(
+			TLSSecurityProfileToTLSConfig("Intermediate", "VersionTLS13", "", "", GinkgoLogr),
+		).Error().To(MatchError(ContainSubstring("only valid with")))
 	})
 
 	It("should return error when named profile has --tls-ciphers set", func() {
-		_, err := TLSSecurityProfileToTLSConfig("Old", "", "ECDHE-RSA-AES128-GCM-SHA256")
-		Expect(err).To(HaveOccurred())
-		Expect(err.Error()).To(ContainSubstring("only valid with"))
+		Expect(
+			TLSSecurityProfileToTLSConfig("Old", "", "ECDHE-RSA-AES128-GCM-SHA256", "", GinkgoLogr),
+		).Error().To(MatchError(ContainSubstring("only valid with")))
+	})
+
+	It("should return error when named profile has --tls-groups set", func() {
+		Expect(
+			TLSSecurityProfileToTLSConfig("Old", "", "", "X25519MLKEM768,X25519", GinkgoLogr),
+		).Error().To(MatchError(ContainSubstring("only valid with")))
 	})
 
 	It("should return error for unknown profile type", func() {
-		_, err := TLSSecurityProfileToTLSConfig("InvalidProfile", "", "")
-		Expect(err).To(HaveOccurred())
-		Expect(err.Error()).To(ContainSubstring("unknown TLS security profile"))
+		Expect(
+			TLSSecurityProfileToTLSConfig("InvalidProfile", "", "", "", GinkgoLogr),
+		).Error().To(MatchError(ContainSubstring("unknown TLS security profile")))
 	})
 
 	It("should return error for Custom profile with missing min version", func() {
-		_, err := TLSSecurityProfileToTLSConfig("Custom", "", "ECDHE-RSA-AES128-GCM-SHA256")
-		Expect(err).To(HaveOccurred())
-		Expect(err.Error()).To(ContainSubstring("tls-min-version"))
+		Expect(
+			TLSSecurityProfileToTLSConfig("Custom", "", "ECDHE-RSA-AES128-GCM-SHA256", "", GinkgoLogr),
+		).Error().To(MatchError(ContainSubstring("tls-min-version")))
 	})
 
 	It("should return error for Custom profile with missing ciphers", func() {
-		_, err := TLSSecurityProfileToTLSConfig("Custom", "VersionTLS12", "")
-		Expect(err).To(HaveOccurred())
-		Expect(err.Error()).To(ContainSubstring("ciphers"))
+		Expect(
+			TLSSecurityProfileToTLSConfig("Custom", "VersionTLS12", "", "X25519MLKEM768,X25519", GinkgoLogr),
+		).Error().To(MatchError(ContainSubstring("ciphers")))
+	})
+
+	It("should not return error for Custom profile with missing ciphers, if the minVersion is 1.3", func() {
+		Expect(
+			TLSSecurityProfileToTLSConfig("Custom", "VersionTLS13", "", "X25519MLKEM768,X25519", GinkgoLogr),
+		).Error().ToNot(HaveOccurred())
+	})
+
+	It("should return error for Custom profile with missing groups", func() {
+		Expect(
+			TLSSecurityProfileToTLSConfig("Custom", "VersionTLS12", "ECDHE-RSA-AES128-GCM-SHA256", "", GinkgoLogr),
+		).Error().To(MatchError(ContainSubstring("groups")))
 	})
 
 	It("should return error for Custom profile with whitespace-only ciphers", func() {
-		_, err := TLSSecurityProfileToTLSConfig("Custom", "VersionTLS12", " , , ")
-		Expect(err).To(HaveOccurred())
-		Expect(err.Error()).To(ContainSubstring("ciphers"))
+		Expect(
+			TLSSecurityProfileToTLSConfig("Custom", "VersionTLS12", " , , ", "", GinkgoLogr),
+		).Error().To(MatchError(ContainSubstring("ciphers")))
 	})
 
 	It("should return error for Custom profile with invalid min version", func() {
-		_, err := TLSSecurityProfileToTLSConfig("Custom", "VersionTLS99", "ECDHE-RSA-AES128-GCM-SHA256")
-		Expect(err).To(HaveOccurred())
-		Expect(err.Error()).To(ContainSubstring("unknown tls version"))
+		Expect(TLSSecurityProfileToTLSConfig(
+			"Custom",
+			"VersionTLS99",
+			"ECDHE-RSA-AES128-GCM-SHA256",
+			"X25519MLKEM768,X25519",
+			GinkgoLogr,
+		)).Error().To(MatchError(ContainSubstring("unknown tls version")))
 	})
 })

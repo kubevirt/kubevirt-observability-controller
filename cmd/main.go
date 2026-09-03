@@ -87,6 +87,7 @@ func main() {
 	var tlsSecurityProfile string
 	var tlsMinVersion string
 	var tlsCiphers string
+	var tlsGroups string
 	var tlsOpts []func(*tls.Config)
 	flag.StringVar(&metricsAddr, "metrics-bind-address", ":8080", "The address the metrics endpoint binds to. "+
 		"Use :8443 for HTTPS or :8080 for HTTP.")
@@ -114,6 +115,9 @@ func main() {
 	flag.StringVar(&tlsCiphers, "tls-ciphers", "",
 		"Comma-separated list of OpenSSL cipher names. "+
 			"Only valid with --tls-security-profile=Custom.")
+	flag.StringVar(&tlsGroups, "tls-groups", "",
+		"Comma-separated list of OpenSSL group names. "+
+			"Only valid with --tls-security-profile=Custom.")
 	flag.StringVar(&metricsAllowlist, "metrics-allowlist", "",
 		"Comma-separated list of metric names to expose. Empty (default) exposes all. \"none\" disables all custom metrics.")
 	flag.StringVar(&alertsAllowlistRaw, "alerts-allowlist", "",
@@ -139,7 +143,8 @@ func main() {
 	opts.BindFlags(flag.CommandLine)
 	flag.Parse()
 
-	ctrl.SetLogger(zap.New(zap.UseFlagOptions(&opts)))
+	logger := zap.New(zap.UseFlagOptions(&opts))
+	ctrl.SetLogger(logger)
 
 	// if the enable-http2 flag is false (the default), http/2 should be disabled
 	// due to its vulnerabilities. More specifically, disabling http/2 will
@@ -207,7 +212,7 @@ func main() {
 
 	if tlsSecurityProfile != "" {
 		tlsConfigFn, err := tlsutil.TLSSecurityProfileToTLSConfig(
-			tlsSecurityProfile, tlsMinVersion, tlsCiphers,
+			tlsSecurityProfile, tlsMinVersion, tlsCiphers, tlsGroups, logger,
 		)
 		if err != nil {
 			setupLog.Error(err, "invalid TLS security profile configuration")

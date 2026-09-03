@@ -23,42 +23,60 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/go-logr/logr"
 	configv1 "github.com/openshift/api/config/v1"
 	ocpcrypto "github.com/openshift/library-go/pkg/crypto"
 )
 
-func TLSSecurityProfileToTLSConfig(profileType string, minVersion string, ciphers string) (func(*tls.Config), error) {
+func TLSSecurityProfileToTLSConfig(
+	profileType, minVersion, ciphers, groups string, logger logr.Logger,
+) (func(*tls.Config), error) {
 	var profileMinVersion string
 	var profileCiphers []string
+	var profileGroups []configv1.TLSGroup
 
 	tlsProfileType := configv1.TLSProfileType(profileType)
 
 	switch tlsProfileType {
 	case configv1.TLSProfileOldType, configv1.TLSProfileIntermediateType, configv1.TLSProfileModernType:
-		if minVersion != "" || ciphers != "" {
+		if minVersion != "" || ciphers != "" || groups != "" {
 			return nil, fmt.Errorf(
-				"--tls-min-version and --tls-ciphers are only valid with --tls-security-profile=Custom",
+				"--tls-min-version, --tls-ciphers and --tls-groups are only valid with --tls-security-profile=Custom",
 			)
 		}
 		spec := configv1.TLSProfiles[tlsProfileType]
 		profileMinVersion = string(spec.MinTLSVersion)
 		profileCiphers = spec.Ciphers
+		profileGroups = spec.Groups
+
 	case configv1.TLSProfileCustomType:
 		if minVersion == "" {
 			return nil, fmt.Errorf("--tls-min-version is required when --tls-security-profile=Custom")
 		}
+
 		if ciphers == "" {
-			return nil, fmt.Errorf("--tls-ciphers is required when --tls-security-profile=Custom")
-		}
-		profileMinVersion = minVersion
-		for _, c := range strings.Split(ciphers, ",") {
-			if s := strings.TrimSpace(c); s != "" {
-				profileCiphers = append(profileCiphers, s)
+			if minVersion != string(configv1.VersionTLS13) {
+				return nil, fmt.Errorf("--tls-ciphers is required when --tls-security-profile=Custom")
+			}
+		} else {
+			for c := range strings.SplitSeq(ciphers, ",") {
+				if s := strings.TrimSpace(c); s != "" {
+					profileCiphers = append(profileCiphers, s)
+				}
 			}
 		}
-		if len(profileCiphers) == 0 {
+
+		profileMinVersion = minVersion
+		if len(profileCiphers) == 0 && profileMinVersion != string(configv1.VersionTLS13) {
 			return nil, fmt.Errorf("--tls-ciphers is required when --tls-security-profile=Custom")
 		}
+
+		for c := range strings.SplitSeq(groups, ",") {
+			if s := strings.TrimSpace(c); s != "" {
+				profileGroups = append(profileGroups, configv1.TLSGroup(s))
+			}
+		}
+
 	default:
 		return nil, fmt.Errorf(
 			"unknown TLS security profile %q, valid values are: Old, Intermediate, Modern, Custom",
@@ -76,47 +94,70 @@ func TLSSecurityProfileToTLSConfig(profileType string, minVersion string, cipher
 		return nil, err
 	}
 
+	curveIDs, unsupported := ocpcrypto.TLSGroupsToCurveIDs(profileGroups)
+	if len(unsupported) > 0 {
+		logger.WithName("tls-security-profile-logger").Info("unsupported TLS groups ignored", "groups", unsupported)
+	}
+
+	if len(curveIDs) == 0 {
+		return nil, fmt.Errorf("no valid groups resolved from the provided list")
+	}
+
 	return func(cfg *tls.Config) {
 		cfg.MinVersion = goMinVersion
 		cfg.CipherSuites = cipherSuiteIDs
+		cfg.CurvePreferences = curveIDs
 	}, nil
 }
 
-var tls13Ciphers = map[string]bool{
-	"TLS_AES_128_GCM_SHA256":       true,
-	"TLS_AES_256_GCM_SHA384":       true,
-	"TLS_CHACHA20_POLY1305_SHA256": true,
+var tls13Ciphers = map[string]struct{}{
+	"TLS_AES_128_GCM_SHA256":       {},
+	"TLS_AES_256_GCM_SHA384":       {},
+	"TLS_CHACHA20_POLY1305_SHA256": {},
 }
 
-func openSSLCiphersToIDs(opensslCiphers []string) ([]uint16, error) {
-	ianaNames := ocpcrypto.OpenSSLToIANACipherSuites(opensslCiphers)
+var ianaToID map[string]uint16
 
-	ianaToID := make(map[string]uint16)
+func init() {
+	ianaToID = make(map[string]uint16)
+
 	for _, suite := range tls.CipherSuites() {
 		ianaToID[suite.Name] = suite.ID
 	}
 	for _, suite := range tls.InsecureCipherSuites() {
 		ianaToID[suite.Name] = suite.ID
 	}
+}
 
+func ianaCiphersToTLSIDs(ianaNames []string) []uint16 {
 	var ids []uint16
-	hasTLS13Only := true
-	for _, cipher := range opensslCiphers {
-		if !tls13Ciphers[cipher] {
-			hasTLS13Only = false
-			break
-		}
-	}
-
 	for _, name := range ianaNames {
 		if id, ok := ianaToID[name]; ok {
 			ids = append(ids, id)
 		}
 	}
 
+	return ids
+}
+
+func openSSLCiphersToIDs(opensslCiphers []string) ([]uint16, error) {
+	ianaNames := ocpcrypto.OpenSSLToIANACipherSuites(opensslCiphers)
+	hasTLS13Only := isTLS13Only(opensslCiphers)
+	ids := ianaCiphersToTLSIDs(ianaNames)
+
 	if len(ids) == 0 && !hasTLS13Only {
 		return nil, fmt.Errorf("no valid ciphers resolved from the provided list")
 	}
 
 	return ids, nil
+}
+
+func isTLS13Only(opensslCiphers []string) bool {
+	for _, cipher := range opensslCiphers {
+		if _, isV13cipher := tls13Ciphers[cipher]; !isV13cipher {
+			return false
+		}
+	}
+
+	return true
 }
