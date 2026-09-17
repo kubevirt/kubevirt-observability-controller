@@ -76,6 +76,7 @@
 | kubevirt_vmi_vcpu_seconds_total | Metric | Counter | Total amount of time spent in each state by each vcpu. |
 | kubevirt_vmi_vcpu_wait_seconds_total | Metric | Counter | Amount of time spent by each vcpu while waiting on I/O. |
 | kubevirt_vmi_vnic_info | Metric | Gauge | Details of VirtualMachineInstance vNIC interfaces. |
+| kubevirt_vmrestore_info | Metric | Gauge | Information about VirtualMachineRestores. |
 | kubevirt_vmsnapshot_create_date_timestamp_seconds | Metric | Gauge | Virtual Machine Snapshot creation timestamp. |
 | kubevirt_vmsnapshot_info | Metric | Gauge | Information about VirtualMachineSnapshots. |
 | cluster:kubevirt_api_request_deprecated_total:sum | Recording rule | Counter | The total number of requests to deprecated KubeVirt APIs, by API verb (e.g., LIST, WATCH). |
