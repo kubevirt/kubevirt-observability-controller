@@ -47,6 +47,7 @@
 | kubevirt_vmi_memory_usable_bytes | Metric | Gauge | The amount of memory which can be reclaimed by balloon without pushing the guest system to swap. |
 | kubevirt_vmi_migration_end_time_seconds | Metric | Gauge | The time at which the migration ended. |
 | kubevirt_vmi_migration_failed | Metric | Gauge | Indicates if the VMI migration failed. |
+| kubevirt_vmi_migration_info | Metric | Gauge | Information about VirtualMachineInstanceMigrations. |
 | kubevirt_vmi_migration_start_time_seconds | Metric | Gauge | The time at which the migration started. |
 | kubevirt_vmi_migration_succeeded | Metric | Gauge | Indicates if the VMI migration succeeded. |
 | kubevirt_vmi_migrations_in_pending_phase | Metric | Gauge | Number of current pending migrations. |
