@@ -16,7 +16,7 @@ limitations under the License.
 Copyright The KubeVirt Authors.
 */
 
-package metrics
+package inventory
 
 import (
 	"strings"
@@ -27,12 +27,12 @@ import (
 	"k8s.io/client-go/tools/cache"
 )
 
-const inventoryPhaseUnset = "unset"
+const (
+	None       = ""
+	PhaseUnset = "unset"
+)
 
 func listStoreObjects[T any](store cache.Store) []*T {
-	if store == nil {
-		return nil
-	}
 	cachedObjs := store.List()
 	items := make([]*T, 0, len(cachedObjs))
 	for _, obj := range cachedObjs {
@@ -45,42 +45,42 @@ func listStoreObjects[T any](store cache.Store) []*T {
 	return items
 }
 
-func resourcePhaseLabel(phase string) string {
+func ResourcePhaseLabel(phase string) string {
 	if phase == "" {
-		return inventoryPhaseUnset
+		return PhaseUnset
 	}
 	return strings.ToLower(phase)
 }
 
-func typedLocalObjectName(ref *k8sv1.TypedLocalObjectReference) string {
+func TypedLocalObjectName(ref *k8sv1.TypedLocalObjectReference) string {
 	if ref == nil {
 		return None
 	}
 	return ref.Name
 }
 
-func typedLocalObjectKind(ref *k8sv1.TypedLocalObjectReference) string {
+func TypedLocalObjectKind(ref *k8sv1.TypedLocalObjectReference) string {
 	if ref == nil {
 		return None
 	}
 	return ref.Kind
 }
 
-func optionalStringLabel(value *string) string {
+func OptionalStringLabel(value *string) string {
 	if value == nil || *value == "" {
 		return None
 	}
 	return *value
 }
 
-func boolGaugeValue(enabled bool) float64 {
+func BoolGaugeValue(enabled bool) float64 {
 	if enabled {
 		return 1
 	}
 	return 0
 }
 
-func collectUnixTimestamp(
+func CollectUnixTimestamp(
 	metric operatormetrics.Metric,
 	timestamp metav1.Time,
 	labels []string,
@@ -95,7 +95,7 @@ func collectUnixTimestamp(
 	}}
 }
 
-func collectOptionalUnixTimestamp(
+func CollectOptionalUnixTimestamp(
 	metric operatormetrics.Metric,
 	timestamp *metav1.Time,
 	labels []string,
@@ -103,5 +103,24 @@ func collectOptionalUnixTimestamp(
 	if timestamp == nil {
 		return nil
 	}
-	return collectUnixTimestamp(metric, *timestamp, labels)
+	return CollectUnixTimestamp(metric, *timestamp, labels)
+}
+
+// NewCollector reads the active informer store on each scrape. Stores may be
+// initialized or replaced after the collector is registered.
+func NewCollector[T any](
+	metrics []operatormetrics.Metric,
+	getStore func() cache.Store,
+	report func([]*T) []operatormetrics.CollectorResult,
+) operatormetrics.Collector {
+	return operatormetrics.Collector{
+		Metrics: metrics,
+		CollectCallback: func() []operatormetrics.CollectorResult {
+			store := getStore()
+			if store == nil {
+				return nil
+			}
+			return report(listStoreObjects[T](store))
+		},
+	}
 }

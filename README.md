@@ -53,7 +53,8 @@ make build
 ### Run Tests
 
 ```sh
-make test        # unit tests
+make test        # unit tests, Go rule linters, and localized promtool tests
+make check       # all unit/rule tests plus the metric-name linter
 make test-e2e    # end-to-end tests (requires kubevirtci cluster)
 ```
 
@@ -62,7 +63,26 @@ make test-e2e    # end-to-end tests (requires kubevirtci cluster)
 ```sh
 make lint
 make lint-fix
+make lint-metrics      # metric/recording-rule name linter (needs docker or podman)
+make test-rules        # generated rule syntax + localized promtool unit tests
+make prom-rules-verify # alias for test-rules
 ```
+
+`make test` includes `test-rules`, which downloads a pinned native `promtool`.
+To use an existing executable, set `PROMTOOL=/absolute/path/to/promtool`.
+`make check` also runs `lint-metrics`, which needs `docker` or `podman`
+(`CONTAINER_TOOL`, default `docker`).
+
+Place rule fixtures beside their definitions under `pkg/monitoring/rules/`,
+using the suffix `_test.promtool.yml` and `rule_files: [rules.yaml]`.
+The runner generates all rules with install namespace `ci` and default runbook
+URLs, then discovers and runs every fixture, including recording-rule tests.
+
+Inventory collectors for snapshots, restores, exports, clones, and pools live
+in `pkg/monitoring/metrics/vm/`; migration collectors live in
+`pkg/monitoring/metrics/vmi/`. Registration, filtering, and informer setup stay
+in the parent package. Collectors receive store getters so each scrape reads
+the current informer store, including stores initialized after registration.
 
 ### Generate
 

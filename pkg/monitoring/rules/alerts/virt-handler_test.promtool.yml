@@ -1,0 +1,43 @@
+# Rules are generated with the KubeVirt install namespace set to ci.
+rule_files:
+- rules.yaml
+evaluation_interval: 1m
+group_eval_order:
+- recordingRules.rules
+- alerts.rules
+tests:
+- name: VirtHandlerDaemonSetRolloutFailing respects its firing delay
+  interval: 1m
+  input_series:
+  - series: kube_daemonset_status_number_ready{namespace="ci", daemonset="virt-handler"}
+    values: 0+0x20
+  - series: kube_daemonset_status_desired_number_scheduled{namespace="ci", daemonset="virt-handler"}
+    values: 1+0x20
+  alert_rule_test:
+  - eval_time: 14m
+    alertname: VirtHandlerDaemonSetRolloutFailing
+    exp_alerts: []
+  - eval_time: 15m
+    alertname: VirtHandlerDaemonSetRolloutFailing
+    exp_alerts:
+    - exp_annotations:
+        summary: Some virt-handlers failed to roll out
+        runbook_url: https://kubevirt.io/monitoring/runbooks/VirtHandlerDaemonSetRolloutFailing
+      exp_labels:
+        severity: warning
+        operator_health_impact: warning
+        kubernetes_operator_part_of: kubevirt
+        kubernetes_operator_component: kubevirt
+        namespace: ci
+        daemonset: virt-handler
+- name: VirtHandlerDaemonSetRolloutFailing remains inactive when healthy
+  interval: 1m
+  input_series:
+  - series: kube_daemonset_status_number_ready{namespace="ci", daemonset="virt-handler"}
+    values: 1+0x20
+  - series: kube_daemonset_status_desired_number_scheduled{namespace="ci", daemonset="virt-handler"}
+    values: 1+0x20
+  alert_rule_test:
+  - eval_time: 15m
+    alertname: VirtHandlerDaemonSetRolloutFailing
+    exp_alerts: []

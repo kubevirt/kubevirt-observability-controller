@@ -16,7 +16,7 @@ limitations under the License.
 Copyright The KubeVirt Authors.
 */
 
-package metrics
+package vmi
 
 import (
 	. "github.com/onsi/ginkgo/v2"
@@ -135,6 +135,8 @@ var _ = Describe("Migration Stats Collector", func() {
 			results := migrationInfoResults(ReportMigrationStats([]*k6tv1.VirtualMachineInstanceMigration{vmim}))
 			Expect(results).To(HaveLen(1))
 			Expect(results[0].Value).To(Equal(1.0))
+			Expect(results[0].GetLabelValue("name")).To(Equal("test-vmim"))
+			Expect(results[0].GetLabelValue("vmi")).To(Equal("test-vmi"))
 			Expect(results[0].Labels).To(Equal([]string{
 				"test-ns", "test-vmi", "test-vmim", "test-vmim-uid",
 				"", "",

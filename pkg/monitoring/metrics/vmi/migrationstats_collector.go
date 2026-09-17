@@ -16,7 +16,7 @@ limitations under the License.
 Copyright The KubeVirt Authors.
 */
 
-package metrics
+package vmi
 
 import (
 	"strings"
@@ -24,8 +24,10 @@ import (
 	"github.com/rhobs/operator-observability-toolkit/pkg/operatormetrics"
 	k8sv1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-
+	"k8s.io/client-go/tools/cache"
 	k6tv1 "kubevirt.io/api/core/v1"
+
+	"github.com/kubevirt/kubevirt-observability-controller/pkg/monitoring/metrics/internal/inventory"
 )
 
 const (
@@ -42,24 +44,22 @@ const (
 	migrationReasonCanceled      = "canceled"
 	migrationReasonUnschedulable = "unschedulable"
 	migrationReasonFailed        = "failed"
-
-	migrationPhaseUnset = "unset"
 )
 
-var (
-	MigrationStatsCollector = operatormetrics.Collector{
-		Metrics: []operatormetrics.Metric{
-			PendingMigrations,
-			SchedulingMigrations,
-			UnsetMigration,
-			RunningMigrations,
-			SucceededMigration,
-			FailedMigration,
-			MigrationInfo,
-		},
-		CollectCallback: migrationStatsCollectorCallback,
-	}
+// NewMigrationStatsCollector collects migration metrics from the current informer store.
+func NewMigrationStatsCollector(getStore func() cache.Store) operatormetrics.Collector {
+	return inventory.NewCollector([]operatormetrics.Metric{
+		PendingMigrations,
+		SchedulingMigrations,
+		UnsetMigration,
+		RunningMigrations,
+		SucceededMigration,
+		FailedMigration,
+		MigrationInfo,
+	}, getStore, ReportMigrationStats)
+}
 
+var (
 	PendingMigrations = operatormetrics.NewGauge(
 		operatormetrics.MetricOpts{
 			Name: "kubevirt_vmi_migrations_in_pending_phase",
@@ -110,32 +110,13 @@ var (
 			Help: "Information about VirtualMachineInstanceMigrations.",
 		},
 		[]string{
-			"namespace", "name", "migration_name", "uid",
+			"namespace", "vmi", "name", "uid",
 			"source_node", "target_node",
 			"phase", "trigger", "result", "reason",
 			"mode", "priority", "migration_policy", "network_type",
 		},
 	)
 )
-
-func migrationStatsCollectorCallback() []operatormetrics.CollectorResult {
-	idx := getIndexers()
-	if idx == nil || idx.VMIMigration == nil {
-		return []operatormetrics.CollectorResult{}
-	}
-
-	cachedObjs := idx.VMIMigration.List()
-	vmims := make([]*k6tv1.VirtualMachineInstanceMigration, 0, len(cachedObjs))
-	for _, obj := range cachedObjs {
-		vmim, ok := obj.(*k6tv1.VirtualMachineInstanceMigration)
-		if !ok {
-			continue
-		}
-		vmims = append(vmims, vmim)
-	}
-
-	return ReportMigrationStats(vmims)
-}
 
 func ReportMigrationStats(
 	vmims []*k6tv1.VirtualMachineInstanceMigration,
@@ -192,8 +173,8 @@ func ReportMigrationStats(
 
 func collectMigrationInfo(vmim *k6tv1.VirtualMachineInstanceMigration) operatormetrics.CollectorResult {
 	state := vmim.Status.MigrationState
-	sourceNode := None
-	targetNode := None
+	sourceNode := inventory.None
+	targetNode := inventory.None
 	if state != nil {
 		sourceNode = state.SourceNode
 		targetNode = state.TargetNode
@@ -211,7 +192,7 @@ func collectMigrationInfo(vmim *k6tv1.VirtualMachineInstanceMigration) operatorm
 			string(vmim.UID),
 			sourceNode,
 			targetNode,
-			getMigrationPhaseLabel(vmim.Status.Phase),
+			inventory.ResourcePhaseLabel(string(vmim.Status.Phase)),
 			getMigrationTrigger(vmim),
 			result,
 			getMigrationReason(vmim, result),
@@ -221,13 +202,6 @@ func collectMigrationInfo(vmim *k6tv1.VirtualMachineInstanceMigration) operatorm
 			getMigrationNetworkType(state),
 		},
 	}
-}
-
-func getMigrationPhaseLabel(phase k6tv1.VirtualMachineInstanceMigrationPhase) string {
-	if phase == k6tv1.MigrationPhaseUnset {
-		return migrationPhaseUnset
-	}
-	return strings.ToLower(string(phase))
 }
 
 func getMigrationResult(phase k6tv1.VirtualMachineInstanceMigrationPhase) string {
@@ -279,28 +253,28 @@ func getMigrationReason(vmim *k6tv1.VirtualMachineInstanceMigration, result stri
 
 func getMigrationMode(state *k6tv1.VirtualMachineInstanceMigrationState) string {
 	if state == nil || state.Mode == "" {
-		return None
+		return inventory.None
 	}
 	return strings.ToLower(string(state.Mode))
 }
 
 func getMigrationPriority(priority *k6tv1.MigrationPriority) string {
 	if priority == nil || *priority == "" {
-		return None
+		return inventory.None
 	}
 	return string(*priority)
 }
 
 func getMigrationPolicyName(state *k6tv1.VirtualMachineInstanceMigrationState) string {
 	if state == nil || state.MigrationPolicyName == nil || *state.MigrationPolicyName == "" {
-		return None
+		return inventory.None
 	}
 	return *state.MigrationPolicyName
 }
 
 func getMigrationNetworkType(state *k6tv1.VirtualMachineInstanceMigrationState) string {
 	if state == nil || state.MigrationNetworkType == "" {
-		return None
+		return inventory.None
 	}
 	return strings.ToLower(string(state.MigrationNetworkType))
 }

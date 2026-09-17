@@ -16,26 +16,28 @@ limitations under the License.
 Copyright The KubeVirt Authors.
 */
 
-package metrics
+package vm
 
 import (
 	"strconv"
 	"strings"
 
 	"github.com/rhobs/operator-observability-toolkit/pkg/operatormetrics"
-
+	"k8s.io/client-go/tools/cache"
 	snapshotv1 "kubevirt.io/api/snapshot/v1beta1"
+
+	"github.com/kubevirt/kubevirt-observability-controller/pkg/monitoring/metrics/internal/inventory"
 )
 
-var (
-	VMSnapshotStatsCollector = operatormetrics.Collector{
-		Metrics: []operatormetrics.Metric{
-			vmSnapshotInfo,
-			vmSnapshotCreationTimestamp,
-		},
-		CollectCallback: vmSnapshotStatsCollectorCallback,
-	}
+// NewVMSnapshotStatsCollector collects snapshot metrics from the current informer store.
+func NewVMSnapshotStatsCollector(getStore func() cache.Store) operatormetrics.Collector {
+	return inventory.NewCollector([]operatormetrics.Metric{
+		vmSnapshotInfo,
+		vmSnapshotCreationTimestamp,
+	}, getStore, reportVMSnapshotStats)
+}
 
+var (
 	vmSnapshotInfo = operatormetrics.NewGaugeVec(
 		operatormetrics.MetricOpts{
 			Name: "kubevirt_vmsnapshot_info",
@@ -52,14 +54,6 @@ var (
 		[]string{"name", "namespace"},
 	)
 )
-
-func vmSnapshotStatsCollectorCallback() []operatormetrics.CollectorResult {
-	stores := getStores()
-	if stores == nil {
-		return []operatormetrics.CollectorResult{}
-	}
-	return reportVMSnapshotStats(listStoreObjects[snapshotv1.VirtualMachineSnapshot](stores.VMSnapshot))
-}
 
 func reportVMSnapshotStats(snapshots []*snapshotv1.VirtualMachineSnapshot) []operatormetrics.CollectorResult {
 	results := make([]operatormetrics.CollectorResult, 0, 2*len(snapshots))
@@ -88,7 +82,7 @@ func collectVMSnapshotInfo(snapshot *snapshotv1.VirtualMachineSnapshot) operator
 func collectVMSnapshotCreationTimestamp(
 	snapshot *snapshotv1.VirtualMachineSnapshot,
 ) []operatormetrics.CollectorResult {
-	return collectUnixTimestamp(
+	return inventory.CollectUnixTimestamp(
 		vmSnapshotCreationTimestamp,
 		snapshot.CreationTimestamp,
 		[]string{snapshot.Name, snapshot.Namespace},
@@ -97,7 +91,7 @@ func collectVMSnapshotCreationTimestamp(
 
 func vmSnapshotPhase(snapshot *snapshotv1.VirtualMachineSnapshot) string {
 	if snapshot.Status == nil {
-		return None
+		return inventory.None
 	}
 	return strings.ToLower(string(snapshot.Status.Phase))
 }

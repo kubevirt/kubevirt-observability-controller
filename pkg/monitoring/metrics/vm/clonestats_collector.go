@@ -16,23 +16,25 @@ limitations under the License.
 Copyright The KubeVirt Authors.
 */
 
-package metrics
+package vm
 
 import (
 	"github.com/rhobs/operator-observability-toolkit/pkg/operatormetrics"
-
+	"k8s.io/client-go/tools/cache"
 	clonev1 "kubevirt.io/api/clone/v1beta1"
+
+	"github.com/kubevirt/kubevirt-observability-controller/pkg/monitoring/metrics/internal/inventory"
 )
 
-var (
-	VMCloneStatsCollector = operatormetrics.Collector{
-		Metrics: []operatormetrics.Metric{
-			vmCloneInfo,
-			vmCloneCreationTimestamp,
-		},
-		CollectCallback: vmCloneStatsCollectorCallback,
-	}
+// NewVMCloneStatsCollector collects clone metrics from the current informer store.
+func NewVMCloneStatsCollector(getStore func() cache.Store) operatormetrics.Collector {
+	return inventory.NewCollector([]operatormetrics.Metric{
+		vmCloneInfo,
+		vmCloneCreationTimestamp,
+	}, getStore, reportVMCloneStats)
+}
 
+var (
 	vmCloneInfo = operatormetrics.NewGaugeVec(
 		operatormetrics.MetricOpts{
 			Name: "kubevirt_vmclone_info",
@@ -49,17 +51,9 @@ var (
 			Name: "kubevirt_vmclone_create_date_timestamp_seconds",
 			Help: "Virtual Machine Clone creation timestamp.",
 		},
-		[]string{"name", "namespace"},
+		[]string{"namespace", "name"},
 	)
 )
-
-func vmCloneStatsCollectorCallback() []operatormetrics.CollectorResult {
-	stores := getStores()
-	if stores == nil {
-		return []operatormetrics.CollectorResult{}
-	}
-	return reportVMCloneStats(listStoreObjects[clonev1.VirtualMachineClone](stores.VMClone))
-}
 
 func reportVMCloneStats(clones []*clonev1.VirtualMachineClone) []operatormetrics.CollectorResult {
 	results := make([]operatormetrics.CollectorResult, 0, 2*len(clones))
@@ -78,27 +72,27 @@ func collectVMCloneInfo(vmClone *clonev1.VirtualMachineClone) operatormetrics.Co
 			vmClone.Namespace,
 			vmClone.Name,
 			string(vmClone.UID),
-			typedLocalObjectName(vmClone.Spec.Source),
-			typedLocalObjectKind(vmClone.Spec.Source),
+			inventory.TypedLocalObjectName(vmClone.Spec.Source),
+			inventory.TypedLocalObjectKind(vmClone.Spec.Source),
 			cloneTargetVM(vmClone),
-			optionalStringLabel(vmClone.Status.SnapshotName),
-			optionalStringLabel(vmClone.Status.RestoreName),
-			resourcePhaseLabel(string(vmClone.Status.Phase)),
+			inventory.OptionalStringLabel(vmClone.Status.SnapshotName),
+			inventory.OptionalStringLabel(vmClone.Status.RestoreName),
+			inventory.ResourcePhaseLabel(string(vmClone.Status.Phase)),
 		},
 	}
 }
 
 func cloneTargetVM(vmClone *clonev1.VirtualMachineClone) string {
-	if name := typedLocalObjectName(vmClone.Spec.Target); name != None {
+	if name := inventory.TypedLocalObjectName(vmClone.Spec.Target); name != inventory.None {
 		return name
 	}
-	return optionalStringLabel(vmClone.Status.TargetName)
+	return inventory.OptionalStringLabel(vmClone.Status.TargetName)
 }
 
 func collectVMCloneCreationTimestamp(vmClone *clonev1.VirtualMachineClone) []operatormetrics.CollectorResult {
-	return collectUnixTimestamp(
+	return inventory.CollectUnixTimestamp(
 		vmCloneCreationTimestamp,
 		vmClone.CreationTimestamp,
-		[]string{vmClone.Name, vmClone.Namespace},
+		[]string{vmClone.Namespace, vmClone.Name},
 	)
 }
