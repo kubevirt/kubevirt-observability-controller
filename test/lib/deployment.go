@@ -73,9 +73,6 @@ rules:
   resources: ["prometheusrules"]
   verbs: ["get", "list", "watch", "create", "update", "delete"]
 - apiGroups: [""]
-  resources: ["configmaps"]
-  verbs: ["get"]
-- apiGroups: [""]
   resources: ["services"]
   verbs: ["get", "list", "watch", "create", "update", "delete"]
 - apiGroups: [""]
@@ -96,7 +93,32 @@ roleRef:
 subjects:
 - kind: ServiceAccount
   name: %[1]s
-  namespace: %[2]s`, ControllerName, namespace)
+  namespace: %[2]s
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: %[1]s-guest-device-drivers
+  namespace: %[2]s
+rules:
+- apiGroups: [""]
+  resources: ["configmaps"]
+  resourceNames: ["%[3]s"]
+  verbs: ["get", "list", "watch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: %[1]s-guest-device-drivers
+  namespace: %[2]s
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: %[1]s-guest-device-drivers
+subjects:
+- kind: ServiceAccount
+  name: %[1]s
+  namespace: %[2]s`, ControllerName, namespace, GuestDriversConfigMapName)
 }
 
 func deploymentManifest(namespace, image string, extraArgs ...string) string {

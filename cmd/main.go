@@ -36,6 +36,8 @@ import (
 	_ "k8s.io/client-go/plugin/pkg/client/auth"
 
 	monitoringv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
+	k8sv1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
@@ -46,6 +48,8 @@ import (
 	poolv1 "kubevirt.io/api/pool/v1beta1"
 	snapshotv1 "kubevirt.io/api/snapshot/v1beta1"
 	ctrl "sigs.k8s.io/controller-runtime"
+	ctrlcache "sigs.k8s.io/controller-runtime/pkg/cache"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 
 	"sigs.k8s.io/controller-runtime/pkg/certwatcher"
@@ -57,6 +61,7 @@ import (
 
 	"github.com/kubevirt/kubevirt-observability-controller/pkg/controller"
 	"github.com/kubevirt/kubevirt-observability-controller/pkg/monitoring/metrics"
+	"github.com/kubevirt/kubevirt-observability-controller/pkg/monitoring/metrics/devicedrivers"
 	"github.com/kubevirt/kubevirt-observability-controller/pkg/monitoring/metrics/vmstats"
 	"github.com/kubevirt/kubevirt-observability-controller/pkg/tlsutil"
 	// +kubebuilder:scaffold:imports
@@ -274,18 +279,23 @@ func main() {
 		os.Exit(1)
 	}
 
-	if allowlist != nil {
-		registered := metrics.ListMetrics()
-		registeredNames := make(map[string]bool, len(registered))
-		for _, m := range registered {
-			registeredNames[m.GetOpts().Name] = true
-		}
-		for name := range allowlist {
-			if !registeredNames[name] {
-				setupLog.Info("metrics-allowlist contains unknown metric name", "metric", name)
-			}
-		}
-		setupLog.Info("metrics allowlist active", "count", len(registered))
+	podNamespace := getPodNamespace()
+	serviceAccountName := os.Getenv("POD_SERVICE_ACCOUNT")
+
+	if podNamespace == "" {
+		setupLog.Error(fmt.Errorf("POD_NAMESPACE not set"), "missing required environment variable")
+		os.Exit(1)
+	}
+
+	if serviceAccountName == "" {
+		setupLog.Error(fmt.Errorf("POD_SERVICE_ACCOUNT not set"), "missing required environment variable")
+		os.Exit(1)
+	}
+
+	driversCache := devicedrivers.NewDriversCache()
+	if err := devicedrivers.RegisterCollector(driversCache, allowlist); err != nil {
+		setupLog.Error(err, "unable to register guest device drivers collector")
+		os.Exit(1)
 	}
 
 	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{
@@ -295,6 +305,19 @@ func main() {
 		HealthProbeBindAddress: probeAddr,
 		LeaderElection:         enableLeaderElection,
 		LeaderElectionID:       "e0e374f1.kubevirt.io",
+		Cache: ctrlcache.Options{
+			ByObject: map[client.Object]ctrlcache.ByObject{
+				&k8sv1.ConfigMap{}: {
+					Namespaces: map[string]ctrlcache.Config{
+						podNamespace: {
+							FieldSelector: fields.OneTermEqualSelector(
+								"metadata.name", controller.GuestDeviceDriversConfigMapName,
+							),
+						},
+					},
+				},
+			},
+		},
 		// LeaderElectionReleaseOnCancel defines if the leader should step down voluntarily
 		// when the Manager ends. This requires the binary to immediately end when the
 		// Manager is stopped, otherwise, this setting is unsafe. Setting this significantly
@@ -309,19 +332,6 @@ func main() {
 	})
 	if err != nil {
 		setupLog.Error(err, "unable to start manager")
-		os.Exit(1)
-	}
-
-	podNamespace := getPodNamespace()
-	serviceAccountName := os.Getenv("POD_SERVICE_ACCOUNT")
-
-	if podNamespace == "" {
-		setupLog.Error(fmt.Errorf("POD_NAMESPACE not set"), "missing required environment variable")
-		os.Exit(1)
-	}
-
-	if serviceAccountName == "" {
-		setupLog.Error(fmt.Errorf("POD_SERVICE_ACCOUNT not set"), "missing required environment variable")
 		os.Exit(1)
 	}
 
@@ -354,6 +364,15 @@ func main() {
 		os.Exit(1)
 	}
 
+	if err := (&controller.GuestDeviceDriversReconciler{
+		Client:    mgr.GetClient(),
+		Namespace: podNamespace,
+		Cache:     driversCache,
+	}).SetupWithManager(mgr); err != nil {
+		setupLog.Error(err, "unable to create controller", "controller", "GuestDeviceDrivers")
+		os.Exit(1)
+	}
+
 	if err := mgr.Add(manager.RunnableFunc(func(ctx context.Context) error {
 		return metrics.SetupInformers(ctx, mgr.GetCache())
 	})); err != nil {
@@ -366,6 +385,8 @@ func main() {
 	} else {
 		setupLog.Info("VMStats polling disabled")
 	}
+
+	logAllowlistStatus(allowlist)
 
 	// +kubebuilder:scaffold:builder
 
@@ -399,6 +420,28 @@ func main() {
 		setupLog.Error(err, "problem running manager")
 		os.Exit(1)
 	}
+}
+
+// logAllowlistStatus must run once every collector is registered, otherwise
+// metrics registered later are reported as unknown names.
+func logAllowlistStatus(allowlist map[string]bool) {
+	if allowlist == nil {
+		return
+	}
+
+	registered := metrics.ListMetrics()
+	registeredNames := make(map[string]bool, len(registered))
+	for _, m := range registered {
+		registeredNames[m.GetOpts().Name] = true
+	}
+
+	for name := range allowlist {
+		if !registeredNames[name] {
+			setupLog.Info("metrics-allowlist contains unknown metric name", "metric", name)
+		}
+	}
+
+	setupLog.Info("metrics allowlist active", "count", len(registered))
 }
 
 func setupVMStats(

@@ -6,6 +6,8 @@ import (
 	"github.com/rhobs/operator-observability-toolkit/pkg/docs"
 
 	"github.com/kubevirt/kubevirt-observability-controller/pkg/monitoring/metrics"
+	"github.com/kubevirt/kubevirt-observability-controller/pkg/monitoring/metrics/devicedrivers"
+	"github.com/kubevirt/kubevirt-observability-controller/pkg/monitoring/metrics/vmstats"
 	"github.com/kubevirt/kubevirt-observability-controller/pkg/monitoring/rules"
 )
 
@@ -13,6 +15,16 @@ const title = "KubeVirt Observability Controller Metrics and Recording Rules"
 
 func main() {
 	err := metrics.SetupMetrics(nil, nil, nil)
+	if err != nil {
+		panic(err)
+	}
+
+	err = vmstats.RegisterCollector(vmstats.NewStatsCache(), nil)
+	if err != nil {
+		panic(err)
+	}
+
+	err = devicedrivers.RegisterCollector(devicedrivers.NewDriversCache(), nil)
 	if err != nil {
 		panic(err)
 	}

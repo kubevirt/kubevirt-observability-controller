@@ -19,19 +19,22 @@ Copyright The KubeVirt Authors.
 package metrics
 
 import (
+	"fmt"
 	"regexp"
+	"strconv"
 	"strings"
 
 	k8sv1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/tools/cache"
-
 	k6tv1 "kubevirt.io/api/core/v1"
+
+	"github.com/kubevirt/kubevirt-observability-controller/pkg/monitoring/metrics/internal/inventory"
 )
 
 const (
-	None      = ""
+	None      = inventory.None
 	Other     = "<other>"
 	ModelNone = "<none>"
 
@@ -177,6 +180,29 @@ func isValidLabelStart(c byte) bool {
 
 func NamespacedKey(namespace, name string) string {
 	return namespace + "/" + name
+}
+
+// FormatDeviceID renders a PCI device ID as four lower case hex digits without a
+// prefix. Both the device metric and the drivers config loader label device IDs
+// through this helper; any drift between them would silently match nothing.
+func FormatDeviceID(id uint16) string {
+	return fmt.Sprintf("%04x", id)
+}
+
+func NormalizeDeviceID(deviceID string) (string, error) {
+	trimmed := strings.TrimSpace(deviceID)
+	if hex, found := strings.CutPrefix(trimmed, "0x"); found {
+		trimmed = hex
+	} else if hex, found := strings.CutPrefix(trimmed, "0X"); found {
+		trimmed = hex
+	}
+
+	parsed, err := strconv.ParseUint(trimmed, 16, 16)
+	if err != nil {
+		return "", fmt.Errorf("%q is not a 16-bit hex device ID", deviceID)
+	}
+
+	return FormatDeviceID(uint16(parsed)), nil
 }
 
 func GetBinding(iface k6tv1.Interface) (bindingType, bindingName string) {

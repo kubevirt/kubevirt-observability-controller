@@ -29,6 +29,8 @@ var labelFormatter = strings.NewReplacer(".", "_", "/", "_", "-", "_")
 
 const labelPrefix = "kubernetes_vmi_label_"
 
+const noneLabelValue = "<none>"
+
 type VMIReport struct {
 	VMI           *k6tv1.VirtualMachineInstance
 	Stats         *VMStats
@@ -65,6 +67,9 @@ func (r *VMIReport) newCollectorResultWithLabels(
 		labels[k] = v
 	}
 	for k, v := range additionalLabels {
+		if v == "" {
+			v = noneLabelValue
+		}
 		labels[k] = v
 	}
 	return operatormetrics.CollectorResult{

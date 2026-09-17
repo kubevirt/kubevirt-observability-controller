@@ -99,7 +99,7 @@ func TLSSecurityProfileToTLSConfig(
 		logger.WithName("tls-security-profile-logger").Info("unsupported TLS groups ignored", "groups", unsupported)
 	}
 
-	if len(curveIDs) == 0 {
+	if len(profileGroups) > 0 && len(curveIDs) == 0 {
 		return nil, fmt.Errorf("no valid groups resolved from the provided list")
 	}
 
