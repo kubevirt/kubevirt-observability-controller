@@ -16,7 +16,7 @@ limitations under the License.
 Copyright The KubeVirt Authors.
 */
 
-package metrics
+package vm
 
 import (
 	"time"
@@ -165,7 +165,7 @@ var _ = Describe("VM Clone Stats Collector", func() {
 		Expect(results).To(HaveLen(2))
 		Expect(results[1].Metric.GetOpts().Name).To(Equal("kubevirt_vmclone_create_date_timestamp_seconds"))
 		Expect(results[1].Value).To(Equal(float64(createdAt.Unix())))
-		Expect(results[1].Labels).To(Equal([]string{"clone-1", "ns-1"}))
+		Expect(results[1].Labels).To(Equal([]string{"ns-1", "clone-1"}))
 	})
 
 	It("should omit create-date when creationTimestamp is zero", func() {
