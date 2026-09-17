@@ -85,7 +85,7 @@ var (
 			Name: "kubevirt_vmi_migration_start_time_seconds",
 			Help: "The time at which the migration started.",
 		},
-		[]string{"node", "namespace", "name", "migration_name"},
+		[]string{"node", "namespace", "name", "migration_name", "uid"},
 	)
 
 	vmiMigrationEndTime = operatormetrics.NewGaugeVec(
@@ -93,7 +93,7 @@ var (
 			Name: "kubevirt_vmi_migration_end_time_seconds",
 			Help: "The time at which the migration ended.",
 		},
-		[]string{"node", "namespace", "name", "migration_name", "status"},
+		[]string{"node", "namespace", "name", "migration_name", "uid", "status"},
 	)
 
 	vmiVnicInfo = operatormetrics.NewGaugeVec(
@@ -342,6 +342,7 @@ func CollectVMIMigrationTime(
 			),
 			Labels: []string{
 				vmi.Status.NodeName, vmi.Namespace, vmi.Name, migrationName,
+				string(vmi.Status.MigrationState.MigrationUID),
 			},
 		})
 	}
@@ -355,6 +356,7 @@ func CollectVMIMigrationTime(
 			Labels: []string{
 				vmi.Status.NodeName, vmi.Namespace, vmi.Name,
 				migrationName,
+				string(vmi.Status.MigrationState.MigrationUID),
 				CalculateMigrationStatus(vmi.Status.MigrationState),
 			},
 		})

@@ -16,24 +16,26 @@ limitations under the License.
 Copyright The KubeVirt Authors.
 */
 
-package metrics
+package vm
 
 import (
 	"github.com/rhobs/operator-observability-toolkit/pkg/operatormetrics"
-
+	"k8s.io/client-go/tools/cache"
 	k6tv1 "kubevirt.io/api/core/v1"
 	exportv1 "kubevirt.io/api/export/v1"
+
+	"github.com/kubevirt/kubevirt-observability-controller/pkg/monitoring/metrics/internal/inventory"
 )
 
-var (
-	VMExportStatsCollector = operatormetrics.Collector{
-		Metrics: []operatormetrics.Metric{
-			vmExportInfo,
-			vmExportTTLExpirationTimestamp,
-		},
-		CollectCallback: vmExportStatsCollectorCallback,
-	}
+// NewVMExportStatsCollector collects export metrics from the current informer store.
+func NewVMExportStatsCollector(getStore func() cache.Store) operatormetrics.Collector {
+	return inventory.NewCollector([]operatormetrics.Metric{
+		vmExportInfo,
+		vmExportTTLExpirationTimestamp,
+	}, getStore, reportVMExportStats)
+}
 
+var (
 	vmExportInfo = operatormetrics.NewGaugeVec(
 		operatormetrics.MetricOpts{
 			Name: "kubevirt_vmexport_info",
@@ -52,14 +54,6 @@ var (
 	)
 )
 
-func vmExportStatsCollectorCallback() []operatormetrics.CollectorResult {
-	stores := getStores()
-	if stores == nil {
-		return []operatormetrics.CollectorResult{}
-	}
-	return reportVMExportStats(listStoreObjects[exportv1.VirtualMachineExport](stores.VMExport))
-}
-
 func reportVMExportStats(exports []*exportv1.VirtualMachineExport) []operatormetrics.CollectorResult {
 	results := make([]operatormetrics.CollectorResult, 0, 2*len(exports))
 	for _, vmExport := range exports {
@@ -70,9 +64,9 @@ func reportVMExportStats(exports []*exportv1.VirtualMachineExport) []operatormet
 }
 
 func collectVMExportInfo(vmExport *exportv1.VirtualMachineExport) operatormetrics.CollectorResult {
-	phase := inventoryPhaseUnset
+	phase := inventory.PhaseUnset
 	if vmExport.Status != nil {
-		phase = resourcePhaseLabel(string(vmExport.Status.Phase))
+		phase = inventory.ResourcePhaseLabel(string(vmExport.Status.Phase))
 	}
 
 	return operatormetrics.CollectorResult{
@@ -92,21 +86,21 @@ func collectVMExportInfo(vmExport *exportv1.VirtualMachineExport) operatormetric
 
 func exportSourceVM(vmExport *exportv1.VirtualMachineExport) string {
 	if vmExport.Status != nil {
-		if name := optionalStringLabel(vmExport.Status.VirtualMachineName); name != None {
+		if name := inventory.OptionalStringLabel(vmExport.Status.VirtualMachineName); name != inventory.None {
 			return name
 		}
 	}
 	if vmExport.Spec.Source.Kind == k6tv1.VirtualMachineGroupVersionKind.Kind {
 		return vmExport.Spec.Source.Name
 	}
-	return None
+	return inventory.None
 }
 
 func collectVMExportTTLExpiration(vmExport *exportv1.VirtualMachineExport) []operatormetrics.CollectorResult {
 	if vmExport.Status == nil {
 		return nil
 	}
-	return collectOptionalUnixTimestamp(
+	return inventory.CollectOptionalUnixTimestamp(
 		vmExportTTLExpirationTimestamp,
 		vmExport.Status.TTLExpirationTime,
 		[]string{vmExport.Name, vmExport.Namespace},

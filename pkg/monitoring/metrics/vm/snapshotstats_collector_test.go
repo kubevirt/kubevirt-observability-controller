@@ -16,7 +16,7 @@ limitations under the License.
 Copyright The KubeVirt Authors.
 */
 
-package metrics
+package vm
 
 import (
 	"time"
@@ -95,15 +95,15 @@ var _ = Describe("VM Snapshot Stats Collector", func() {
 		Entry("Failed", snapshotv1.Failed, "failed"),
 		Entry("Deleting", snapshotv1.Deleting, "deleting"),
 		Entry("Unknown", snapshotv1.Unknown, "unknown"),
-		Entry("unset", snapshotv1.PhaseUnset, ""),
+		Entry("unset", snapshotv1.PhaseUnset, "unset"),
 	)
 
-	It("should emit info with empty phase when status is nil", func() {
+	It("should emit info with unset phase when status is nil", func() {
 		snapshot := newVMSnapshot("snap-1", "uid-1", "vm-1", snapshotv1.InProgress, createdAt, ptr.To(true))
 		snapshot.Status = nil
 
 		results := reportVMSnapshotStats([]*snapshotv1.VirtualMachineSnapshot{snapshot})
-		Expect(results[0].Labels[4]).To(Equal(""))
+		Expect(results[0].Labels[4]).To(Equal("unset"))
 		Expect(results[0].Labels[5]).To(Equal("false"))
 	})
 

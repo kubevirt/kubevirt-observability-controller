@@ -26,6 +26,7 @@ import (
 
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 	k6tv1 "kubevirt.io/api/core/v1"
 )
 
@@ -183,6 +184,7 @@ var _ = Describe("VMI Stats Collector", func() {
 					MigrationState: &k6tv1.VirtualMachineInstanceMigrationState{
 						StartTimestamp: &startTime,
 						EndTimestamp:   &endTime,
+						MigrationUID:   types.UID("migration-uid"),
 						Completed:      true,
 					},
 				},
@@ -190,6 +192,12 @@ var _ = Describe("VMI Stats Collector", func() {
 
 			results := CollectVMIMigrationTime(vmi)
 			Expect(results).To(HaveLen(2))
+			Expect(results[0].Labels).To(Equal([]string{
+				"node1", "ns1", "vmi1", None, "migration-uid",
+			}))
+			Expect(results[1].Labels).To(Equal([]string{
+				"node1", "ns1", "vmi1", None, "migration-uid", "succeeded",
+			}))
 		})
 	})
 

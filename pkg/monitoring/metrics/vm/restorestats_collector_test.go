@@ -16,7 +16,7 @@ limitations under the License.
 Copyright The KubeVirt Authors.
 */
 
-package metrics
+package vm
 
 import (
 	. "github.com/onsi/ginkgo/v2"

@@ -16,32 +16,34 @@ limitations under the License.
 Copyright The KubeVirt Authors.
 */
 
-package metrics
+package vm
 
 import (
 	"slices"
 
 	"github.com/rhobs/operator-observability-toolkit/pkg/operatormetrics"
 	k8sv1 "k8s.io/api/core/v1"
-
+	"k8s.io/client-go/tools/cache"
 	poolv1 "kubevirt.io/api/pool/v1beta1"
+
+	"github.com/kubevirt/kubevirt-observability-controller/pkg/monitoring/metrics/internal/inventory"
 )
 
 const defaultPoolReplicas = 1
 
-var (
-	VMPoolStatsCollector = operatormetrics.Collector{
-		Metrics: []operatormetrics.Metric{
-			vmPoolInfo,
-			vmPoolDesiredReplicas,
-			vmPoolReplicas,
-			vmPoolReadyReplicas,
-			vmPoolPaused,
-			vmPoolReplicaFailure,
-		},
-		CollectCallback: vmPoolStatsCollectorCallback,
-	}
+// NewVMPoolStatsCollector collects pool metrics from the current informer store.
+func NewVMPoolStatsCollector(getStore func() cache.Store) operatormetrics.Collector {
+	return inventory.NewCollector([]operatormetrics.Metric{
+		vmPoolInfo,
+		vmPoolDesiredReplicas,
+		vmPoolReplicas,
+		vmPoolReadyReplicas,
+		vmPoolPaused,
+		vmPoolReplicaFailure,
+	}, getStore, reportVMPoolStats)
+}
 
+var (
 	vmPoolInfo = operatormetrics.NewGaugeVec(
 		operatormetrics.MetricOpts{
 			Name: "kubevirt_vmpool_info",
@@ -96,14 +98,6 @@ var (
 	)
 )
 
-func vmPoolStatsCollectorCallback() []operatormetrics.CollectorResult {
-	stores := getStores()
-	if stores == nil {
-		return []operatormetrics.CollectorResult{}
-	}
-	return reportVMPoolStats(listStoreObjects[poolv1.VirtualMachinePool](stores.VMPool))
-}
-
 func reportVMPoolStats(pools []*poolv1.VirtualMachinePool) []operatormetrics.CollectorResult {
 	results := make([]operatormetrics.CollectorResult, 0, 6*len(pools))
 	for _, pool := range pools {
@@ -137,12 +131,12 @@ func collectVMPoolStats(pool *poolv1.VirtualMachinePool) []operatormetrics.Colle
 		},
 		{
 			Metric: vmPoolPaused,
-			Value:  boolGaugeValue(pool.Spec.Paused),
+			Value:  inventory.BoolGaugeValue(pool.Spec.Paused),
 			Labels: identity,
 		},
 		{
 			Metric: vmPoolReplicaFailure,
-			Value:  boolGaugeValue(poolHasReplicaFailure(pool)),
+			Value:  inventory.BoolGaugeValue(poolHasReplicaFailure(pool)),
 			Labels: identity,
 		},
 	}

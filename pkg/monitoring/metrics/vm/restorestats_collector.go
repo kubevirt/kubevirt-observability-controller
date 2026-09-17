@@ -16,7 +16,7 @@ limitations under the License.
 Copyright The KubeVirt Authors.
 */
 
-package metrics
+package vm
 
 import (
 	"slices"
@@ -24,34 +24,26 @@ import (
 
 	"github.com/rhobs/operator-observability-toolkit/pkg/operatormetrics"
 	corev1 "k8s.io/api/core/v1"
-
+	"k8s.io/client-go/tools/cache"
 	snapshotv1 "kubevirt.io/api/snapshot/v1beta1"
+
+	"github.com/kubevirt/kubevirt-observability-controller/pkg/monitoring/metrics/internal/inventory"
 )
 
-var (
-	VMRestoreStatsCollector = operatormetrics.Collector{
-		Metrics: []operatormetrics.Metric{
-			vmRestoreInfo,
-		},
-		CollectCallback: vmRestoreStatsCollectorCallback,
-	}
-
-	vmRestoreInfo = operatormetrics.NewGaugeVec(
-		operatormetrics.MetricOpts{
-			Name: "kubevirt_vmrestore_info",
-			Help: "Information about VirtualMachineRestores.",
-		},
-		[]string{"namespace", "name", "uid", "vm", "snapshot_name", "complete", "failure"},
-	)
-)
-
-func vmRestoreStatsCollectorCallback() []operatormetrics.CollectorResult {
-	stores := getStores()
-	if stores == nil {
-		return []operatormetrics.CollectorResult{}
-	}
-	return reportVMRestoreStats(listStoreObjects[snapshotv1.VirtualMachineRestore](stores.VMRestore))
+// NewVMRestoreStatsCollector collects restore metrics from the current informer store.
+func NewVMRestoreStatsCollector(getStore func() cache.Store) operatormetrics.Collector {
+	return inventory.NewCollector([]operatormetrics.Metric{
+		vmRestoreInfo,
+	}, getStore, reportVMRestoreStats)
 }
+
+var vmRestoreInfo = operatormetrics.NewGaugeVec(
+	operatormetrics.MetricOpts{
+		Name: "kubevirt_vmrestore_info",
+		Help: "Information about VirtualMachineRestores.",
+	},
+	[]string{"namespace", "name", "uid", "vm", "snapshot_name", "complete", "failure"},
+)
 
 func reportVMRestoreStats(restores []*snapshotv1.VirtualMachineRestore) []operatormetrics.CollectorResult {
 	results := make([]operatormetrics.CollectorResult, 0, len(restores))
