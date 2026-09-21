@@ -47,6 +47,20 @@ var _ = Describe("StatsCache", func() {
 		Expect(items[0].Stats.DomainStats.Name).To(Equal("ns1_vm1"))
 	})
 
+	It("should report the stored guest agent version", func() {
+		vmi := &k6tv1.VirtualMachineInstance{
+			ObjectMeta: metav1.ObjectMeta{Name: "vm1", Namespace: "ns1"},
+		}
+
+		Expect(cache.AgentVersion("ns1/vm1")).To(BeEmpty())
+
+		cache.Store("ns1/vm1", vmi, nil)
+		Expect(cache.AgentVersion("ns1/vm1")).To(BeEmpty())
+
+		cache.Store("ns1/vm1", vmi, &VMStats{GuestAgentVersion: "8.2.0"})
+		Expect(cache.AgentVersion("ns1/vm1")).To(Equal("8.2.0"))
+	})
+
 	It("should overwrite existing entries", func() {
 		vmi := &k6tv1.VirtualMachineInstance{
 			ObjectMeta: metav1.ObjectMeta{Name: "vm1", Namespace: "ns1"},
