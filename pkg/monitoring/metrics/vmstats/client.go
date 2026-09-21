@@ -51,6 +51,7 @@ var defaultQueryParams = []string{
 	"guestGetUsers",
 	"guestGetDiskStats",
 	"guestNetworkGetInterfaces",
+	"guestGetDevices",
 }
 
 func (c *VMStatsClient) FetchNodeVMStats(ctx context.Context, podIP string) (map[string]*VMStatsResult, error) {

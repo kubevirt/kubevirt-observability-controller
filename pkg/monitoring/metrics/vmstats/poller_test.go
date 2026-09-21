@@ -216,6 +216,59 @@ var _ = Describe("Poller", func() {
 			Expect(items[0].Stats.DomainStats.Name).To(Equal("ns1_vm1"))
 		})
 
+		It("should keep a VMI's stats when a guest agent sub-command fails", func() {
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+				response := map[string]*VMStatsResult{
+					"ns1/vm1": {
+						Stats: &VMStats{
+							DomainStats: DomainStats{
+								Name: "ns1_vm1",
+								Cpu:  &DomainStatsCPU{TimeSet: true, Time: 1_000_000_000},
+							},
+							GuestGetOsInfo: `{"return":{"id":"fedora"}}`,
+							Errors: map[string]string{
+								"guest-get-devices": "QEMU guest agent command failed: CommandNotFound",
+							},
+						},
+					},
+				}
+
+				w.Header().Set("Content-Type", "application/json")
+				Expect(json.NewEncoder(w).Encode(response)).To(Succeed())
+			}))
+			defer server.Close()
+
+			vmiStore := cache.NewStore(cache.MetaNamespaceKeyFunc)
+			Expect(vmiStore.Add(&k6tv1.VirtualMachineInstance{
+				ObjectMeta: metav1.ObjectMeta{Name: "vm1", Namespace: "ns1"},
+				Status:     k6tv1.VirtualMachineInstanceStatus{NodeName: "node1"},
+			})).To(Succeed())
+
+			podStore := cache.NewStore(cache.MetaNamespaceKeyFunc)
+			Expect(podStore.Add(&k8sv1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "virt-handler-abc", Namespace: "kubevirt",
+					Labels: map[string]string{"kubevirt.io": "virt-handler"},
+				},
+				Spec:   k8sv1.PodSpec{NodeName: "node1"},
+				Status: k8sv1.PodStatus{PodIP: "10.0.0.5", Phase: k8sv1.PodRunning},
+			})).To(Succeed())
+
+			statsCache := NewStatsCache()
+			vmClient := NewVMStatsClient(server.Client(), 0)
+			vmClient.baseURLOverride = server.URL
+
+			p := NewPoller(PollerConfig{MaxConcurrent: 10}, statsCache, vmClient, vmiStore, podStore)
+			p.pollOnce()
+
+			items := statsCache.List()
+			Expect(items).To(HaveLen(1))
+			Expect(items[0].Stats.DomainStats.Cpu.Time).To(Equal(uint64(1_000_000_000)))
+			Expect(items[0].Stats.GuestGetOsInfo).To(ContainSubstring("fedora"))
+			Expect(items[0].Stats.GuestGetDevices).To(BeEmpty())
+			Expect(items[0].Stats.Errors).To(HaveKey("guest-get-devices"))
+		})
+
 		It("should prune stale entries from cache", func() {
 			bulkResponse := map[string]*VMStatsResult{
 				"ns1/vm1": {

@@ -15,8 +15,34 @@
 | kubevirt_vm_starting_status_last_transition_timestamp_seconds | Metric | Counter | Virtual Machine last transition timestamp to starting status. |
 | kubevirt_vm_vnic_info | Metric | Gauge | Details of Virtual Machine vNIC interfaces. |
 | kubevirt_vmi_contains_ephemeral_hotplug_volume | Metric | Gauge | Reported only for VMIs that contain an ephemeral hotplug volume. |
+| kubevirt_vmi_cpu_system_usage_seconds_total | Metric | Counter | Total CPU time spent in system mode. |
+| kubevirt_vmi_cpu_usage_seconds_total | Metric | Counter | Total CPU time spent in all modes (sum of both vcpu and hypervisor usage). |
+| kubevirt_vmi_cpu_user_usage_seconds_total | Metric | Counter | Total CPU time spent in user mode. |
+| kubevirt_vmi_dirty_rate_bytes_per_second | Metric | Gauge | Guest dirty-rate in bytes per second. |
+| kubevirt_vmi_guest_device_driver_date_seconds | Metric | Gauge | Release date of the driver of a guest device, in seconds since the epoch, as reported by the guest agent. |
+| kubevirt_vmi_guest_disk_total_bytes | Metric | Gauge | Total disk size in bytes as reported by the guest agent. |
+| kubevirt_vmi_guest_disk_used_bytes | Metric | Gauge | Used disk size in bytes as reported by the guest agent. |
+| kubevirt_vmi_guest_hostname | Metric | Gauge | Guest hostname from the guest agent. |
+| kubevirt_vmi_guest_interface_info | Metric | Gauge | Guest network interface information from the guest agent. |
+| kubevirt_vmi_guest_load_15m | Metric | Gauge | Guest system load average over 15 minutes. |
+| kubevirt_vmi_guest_load_1m | Metric | Gauge | Guest system load average over 1 minute. |
+| kubevirt_vmi_guest_load_5m | Metric | Gauge | Guest system load average over 5 minutes. |
+| kubevirt_vmi_guest_os_info | Metric | Gauge | Guest OS information from the guest agent. |
+| kubevirt_vmi_guest_timezone | Metric | Gauge | Guest timezone from the guest agent. |
+| kubevirt_vmi_guest_user_count | Metric | Gauge | Number of logged-in users in the guest. |
 | kubevirt_vmi_info | Metric | Gauge | Information about VirtualMachineInstances. |
 | kubevirt_vmi_launcher_memory_overhead_bytes | Metric | Gauge | Estimation of the memory amount required for virt-launcher's infrastructure components. |
+| kubevirt_vmi_memory_actual_balloon_bytes | Metric | Gauge | Current balloon size in bytes. |
+| kubevirt_vmi_memory_available_bytes | Metric | Gauge | Amount of usable memory as seen by the domain. |
+| kubevirt_vmi_memory_cached_bytes | Metric | Gauge | The amount of memory that is being used to cache I/O and is available to be reclaimed. |
+| kubevirt_vmi_memory_domain_bytes | Metric | Gauge | The amount of memory in bytes allocated to the domain. |
+| kubevirt_vmi_memory_pgmajfault_total | Metric | Counter | The number of page faults when disk IO was required. |
+| kubevirt_vmi_memory_pgminfault_total | Metric | Counter | The number of other page faults, when disk IO was not required. |
+| kubevirt_vmi_memory_resident_bytes | Metric | Gauge | Resident set size of the process running the domain. |
+| kubevirt_vmi_memory_swap_in_traffic_bytes | Metric | Gauge | The total amount of data read from swap space of the guest in bytes. |
+| kubevirt_vmi_memory_swap_out_traffic_bytes | Metric | Gauge | The total amount of memory written out to swap space of the guest in bytes. |
+| kubevirt_vmi_memory_unused_bytes | Metric | Gauge | The amount of memory left completely unused by the system. |
+| kubevirt_vmi_memory_usable_bytes | Metric | Gauge | The amount of memory which can be reclaimed by balloon without pushing the guest system to swap. |
 | kubevirt_vmi_migration_end_time_seconds | Metric | Gauge | The time at which the migration ended. |
 | kubevirt_vmi_migration_failed | Metric | Gauge | Indicates if the VMI migration failed. |
 | kubevirt_vmi_migration_start_time_seconds | Metric | Gauge | The time at which the migration started. |
@@ -25,8 +51,27 @@
 | kubevirt_vmi_migrations_in_running_phase | Metric | Gauge | Number of current running migrations. |
 | kubevirt_vmi_migrations_in_scheduling_phase | Metric | Gauge | Number of current scheduling migrations. |
 | kubevirt_vmi_migrations_in_unset_phase | Metric | Gauge | Number of current unset migrations. |
+| kubevirt_vmi_network_receive_bytes_total | Metric | Counter | Total network traffic received in bytes. |
+| kubevirt_vmi_network_receive_errors_total | Metric | Counter | Total network received error packets. |
+| kubevirt_vmi_network_receive_packets_dropped_total | Metric | Counter | The total number of rx packets dropped on vNIC interfaces. |
+| kubevirt_vmi_network_receive_packets_total | Metric | Counter | Total network traffic received packets. |
+| kubevirt_vmi_network_transmit_bytes_total | Metric | Counter | Total network traffic transmitted in bytes. |
+| kubevirt_vmi_network_transmit_errors_total | Metric | Counter | Total network transmitted error packets. |
+| kubevirt_vmi_network_transmit_packets_dropped_total | Metric | Counter | The total number of tx packets dropped on vNIC interfaces. |
+| kubevirt_vmi_network_transmit_packets_total | Metric | Counter | Total network traffic transmitted packets. |
 | kubevirt_vmi_non_evictable | Metric | Gauge | Indication for a VirtualMachine that its eviction strategy is set to Live Migration but is not migratable. |
 | kubevirt_vmi_status_addresses | Metric | Gauge | The addresses of a VirtualMachineInstance. |
+| kubevirt_vmi_storage_flush_requests_total | Metric | Counter | Total storage flush requests. |
+| kubevirt_vmi_storage_flush_times_seconds_total | Metric | Counter | Total time spent on cache flushing. |
+| kubevirt_vmi_storage_iops_read_total | Metric | Counter | Total number of I/O read operations. |
+| kubevirt_vmi_storage_iops_write_total | Metric | Counter | Total number of I/O write operations. |
+| kubevirt_vmi_storage_read_times_seconds_total | Metric | Counter | Total time spent on read operations. |
+| kubevirt_vmi_storage_read_traffic_bytes_total | Metric | Counter | Total number of bytes read from storage. |
+| kubevirt_vmi_storage_write_times_seconds_total | Metric | Counter | Total time spent on write operations. |
+| kubevirt_vmi_storage_write_traffic_bytes_total | Metric | Counter | Total number of written bytes. |
+| kubevirt_vmi_vcpu_delay_seconds_total | Metric | Counter | Amount of time spent by each vcpu waiting in the queue instead of running. |
+| kubevirt_vmi_vcpu_seconds_total | Metric | Counter | Total amount of time spent in each state by each vcpu. |
+| kubevirt_vmi_vcpu_wait_seconds_total | Metric | Counter | Amount of time spent by each vcpu while waiting on I/O. |
 | kubevirt_vmi_vnic_info | Metric | Gauge | Details of VirtualMachineInstance vNIC interfaces. |
 | cluster:kubevirt_api_request_deprecated_total:sum | Recording rule | Counter | The total number of requests to deprecated KubeVirt APIs, by API verb (e.g., LIST, WATCH). |
 | cluster:kubevirt_nodes_allocatable:count | Recording rule | Gauge | The number of allocatable nodes in the cluster. |
