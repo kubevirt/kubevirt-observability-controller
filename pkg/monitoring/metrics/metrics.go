@@ -61,7 +61,7 @@ func SetupMetrics(metricsStores *Stores, metricsIndexers *Indexers, allowlist ma
 
 	var filtered []operatormetrics.Collector
 	for _, c := range allCollectors {
-		if fc := filterCollector(c, allowlist); fc != nil {
+		if fc := FilterCollector(c, allowlist); fc != nil {
 			filtered = append(filtered, *fc)
 		}
 	}
@@ -73,7 +73,7 @@ func SetupMetrics(metricsStores *Stores, metricsIndexers *Indexers, allowlist ma
 	return operatormetrics.RegisterCollector(filtered...)
 }
 
-func filterCollector(c operatormetrics.Collector, allowlist map[string]bool) *operatormetrics.Collector {
+func FilterCollector(c operatormetrics.Collector, allowlist map[string]bool) *operatormetrics.Collector {
 	var kept []operatormetrics.Metric
 	for _, m := range c.Metrics {
 		if allowlist[m.GetOpts().Name] {
