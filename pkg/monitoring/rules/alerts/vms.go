@@ -275,4 +275,20 @@ var vmsAlerts = []promv1.Rule{
 			operatorHealthImpactLabelKey: "none",
 		},
 	},
+	{
+		Alert: "OutdatedGuestDeviceDrivers",
+		Expr:  intstr.FromString("vmi:kubevirt_vmi_guest_device_driver_outdated:info{namespace!=''}"),
+		For:   ptr.To(promv1.Duration("1h")),
+		Annotations: map[string]string{
+			summaryAnnotationKey: "A guest device driver is outdated: its installed version is not the latest " +
+				"known version for that device and guest OS version.",
+			descriptionAnnotationKey: "VirtualMachine {{ $labels.name }} in namespace {{ $labels.namespace }} " +
+				"is running driver {{ $labels.driver_name }} version {{ $labels.driver_version }}, " +
+				"which is outdated for guest OS version {{ $labels.guest_os_version_id }}.",
+		},
+		Labels: map[string]string{
+			severityAlertLabelKey:        "warning",
+			operatorHealthImpactLabelKey: "none",
+		},
+	},
 }
