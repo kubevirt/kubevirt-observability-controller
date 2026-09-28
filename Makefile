@@ -114,8 +114,12 @@ vet: ## Run go vet against code.
 	go vet ./...
 
 .PHONY: test
-test: manifests generate fmt goimports-check vet setup-envtest ## Run tests.
+test: manifests generate fmt goimports-check vet setup-envtest test-rules ## Run tests.
 	KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) --bin-dir $(LOCALBIN) -p path)" go test $$(go list ./... | grep -v /e2e | grep -v /test/ | grep -v /cmd) -coverprofile cover.out
+
+.PHONY: test-rules
+test-rules: promtool ## Run promtool unit tests for the Prometheus rules.
+	PROMTOOL=$(PROMTOOL) ./hack/promtool-tests.sh
 
 .PHONY: test-e2e
 test-e2e: ## Run e2e tests against a KubeVirt cluster.
@@ -224,6 +228,7 @@ ENVTEST ?= $(LOCALBIN)/setup-envtest
 GOLANGCI_LINT = $(LOCALBIN)/golangci-lint
 GOVULNCHECK ?= $(LOCALBIN)/govulncheck
 GOIMPORTS ?= $(LOCALBIN)/goimports
+PROMTOOL ?= $(LOCALBIN)/promtool
 
 ## Tool Versions
 KUSTOMIZE_VERSION ?= v5.6.0
@@ -235,6 +240,7 @@ ENVTEST_K8S_VERSION ?= $(shell go list -m -f "{{ .Version }}" k8s.io/api | awk -
 GOLANGCI_LINT_VERSION ?= v2.11.4
 GOVULNCHECK_VERSION ?= v1.6.0
 GOIMPORTS_VERSION ?= v0.33.0
+PROMTOOL_VERSION ?= 3.15.0
 
 .PHONY: kustomize
 kustomize: $(KUSTOMIZE) ## Download kustomize locally if necessary.
@@ -273,6 +279,21 @@ $(GOVULNCHECK): $(LOCALBIN)
 goimports: $(GOIMPORTS) ## Download goimports locally if necessary.
 $(GOIMPORTS): $(LOCALBIN)
 	$(call go-install-tool,$(GOIMPORTS),golang.org/x/tools/cmd/goimports,$(GOIMPORTS_VERSION))
+
+.PHONY: promtool
+promtool: $(PROMTOOL)
+$(PROMTOOL): $(LOCALBIN)
+	@[ -f "$(PROMTOOL)-$(PROMTOOL_VERSION)" ] || { \
+	set -e; \
+	pkg=prometheus-$(PROMTOOL_VERSION).$(shell go env GOOS)-$(shell go env GOARCH) ;\
+	url=https://github.com/prometheus/prometheus/releases/download/v$(PROMTOOL_VERSION)/$${pkg}.tar.gz ;\
+	echo "Downloading $${url}" ;\
+	tmp=$$(mktemp -d "$${TMPDIR:-/tmp}/promtool.XXXXXX") ;\
+	curl -fsSL "$${url}" | tar -xz -C "$${tmp}" "$${pkg}/promtool" ;\
+	mv "$${tmp}/$${pkg}/promtool" "$(PROMTOOL)-$(PROMTOOL_VERSION)" ;\
+	rm -rf "$${tmp}" ;\
+	} ;\
+	ln -sf $(PROMTOOL)-$(PROMTOOL_VERSION) $(PROMTOOL)
 
 # go-install-tool will 'go install' any package with custom target and name of binary, if it doesn't exist
 # $1 - target path with name of binary
