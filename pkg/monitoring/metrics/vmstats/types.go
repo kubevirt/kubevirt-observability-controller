@@ -117,37 +117,55 @@ type DomainStatsNet struct {
 }
 
 type DomainStatsBlock struct {
-	NameSet         bool   `json:"NameSet"`
-	Name            string `json:"Name"`
-	Alias           string `json:"Alias"`
-	BackingIndexSet bool   `json:"BackingIndexSet"`
-	BackingIndex    uint   `json:"BackingIndex"`
-	PathSet         bool   `json:"PathSet"`
-	Path            string `json:"Path"`
-	RdReqsSet       bool   `json:"RdReqsSet"`
-	RdReqs          uint64 `json:"RdReqs"`
-	RdBytesSet      bool   `json:"RdBytesSet"`
-	RdBytes         uint64 `json:"RdBytes"`
-	RdTimesSet      bool   `json:"RdTimesSet"`
-	RdTimes         uint64 `json:"RdTimes"`
-	WrReqsSet       bool   `json:"WrReqsSet"`
-	WrReqs          uint64 `json:"WrReqs"`
-	WrBytesSet      bool   `json:"WrBytesSet"`
-	WrBytes         uint64 `json:"WrBytes"`
-	WrTimesSet      bool   `json:"WrTimesSet"`
-	WrTimes         uint64 `json:"WrTimes"`
-	FlReqsSet       bool   `json:"FlReqsSet"`
-	FlReqs          uint64 `json:"FlReqs"`
-	FlTimesSet      bool   `json:"FlTimesSet"`
-	FlTimes         uint64 `json:"FlTimes"`
-	ErrorsSet       bool   `json:"ErrorsSet"`
-	Errors          uint64 `json:"Errors"`
-	AllocationSet   bool   `json:"AllocationSet"`
-	Allocation      uint64 `json:"Allocation"`
-	CapacitySet     bool   `json:"CapacitySet"`
-	Capacity        uint64 `json:"Capacity"`
-	PhysicalSet     bool   `json:"PhysicalSet"`
-	Physical        uint64 `json:"Physical"`
+	NameSet           bool                              `json:"NameSet"`
+	Name              string                            `json:"Name"`
+	Alias             string                            `json:"Alias"`
+	BackingIndexSet   bool                              `json:"BackingIndexSet"`
+	BackingIndex      uint                              `json:"BackingIndex"`
+	PathSet           bool                              `json:"PathSet"`
+	Path              string                            `json:"Path"`
+	RdReqsSet         bool                              `json:"RdReqsSet"`
+	RdReqs            uint64                            `json:"RdReqs"`
+	RdBytesSet        bool                              `json:"RdBytesSet"`
+	RdBytes           uint64                            `json:"RdBytes"`
+	RdTimesSet        bool                              `json:"RdTimesSet"`
+	RdTimes           uint64                            `json:"RdTimes"`
+	WrReqsSet         bool                              `json:"WrReqsSet"`
+	WrReqs            uint64                            `json:"WrReqs"`
+	WrBytesSet        bool                              `json:"WrBytesSet"`
+	WrBytes           uint64                            `json:"WrBytes"`
+	WrTimesSet        bool                              `json:"WrTimesSet"`
+	WrTimes           uint64                            `json:"WrTimes"`
+	FlReqsSet         bool                              `json:"FlReqsSet"`
+	FlReqs            uint64                            `json:"FlReqs"`
+	FlTimesSet        bool                              `json:"FlTimesSet"`
+	FlTimes           uint64                            `json:"FlTimes"`
+	ErrorsSet         bool                              `json:"ErrorsSet"`
+	Errors            uint64                            `json:"Errors"`
+	AllocationSet     bool                              `json:"AllocationSet"`
+	Allocation        uint64                            `json:"Allocation"`
+	CapacitySet       bool                              `json:"CapacitySet"`
+	Capacity          uint64                            `json:"Capacity"`
+	PhysicalSet       bool                              `json:"PhysicalSet"`
+	Physical          uint64                            `json:"Physical"`
+	LatencyHistograms DomainStatsBlockLatencyHistograms `json:"LatencyHistograms"`
+}
+
+type Histogram struct {
+	Name    string            `json:"Name"`
+	Count   uint64            `json:"Count"`
+	Buckets []HistogramBucket `json:"Buckets"`
+}
+
+type HistogramBucket struct {
+	UpperBound      uint64 `json:"UpperBound"`
+	CumulativeCount uint64 `json:"CumulativeCount"`
+}
+
+type DomainStatsBlockLatencyHistograms struct {
+	Read  *Histogram `json:"Read"`
+	Write *Histogram `json:"Write"`
+	Flush *Histogram `json:"Flush"`
 }
 
 type DomainStatsMemory struct {

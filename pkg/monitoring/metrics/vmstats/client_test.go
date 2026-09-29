@@ -66,6 +66,68 @@ var _ = Describe("VMStatsClient", func() {
 		Expect(results["ns1/vm2"].Stats.DomainStats.Cpu.Time).To(Equal(uint64(2_000_000_000)))
 	})
 
+	It("should parse block latency histograms from VMStats", func() {
+		response := `{
+			"ns1/vm1": {
+				"stats": {
+					"DomainStats": {
+						"Block": [
+							{
+								"NameSet": true,
+								"Name": "vda",
+								"RdTimesSet": true,
+								"RdTimes": 1000000000,
+								"LatencyHistograms": {
+									"Read": {
+    									"Name": "read",
+										"Count": 5,
+    									"Buckets": [
+    										{
+    											"UpperBound": 1000000,
+    											"CumulativeCount": 2
+    										}
+    									]
+    								}
+								}
+							}
+						]
+					}
+				}
+			}
+		}`
+
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			Expect(r.URL.Path).To(Equal("/v1/vmstats"))
+			w.Header().Set("Content-Type", "application/json")
+
+			_, err := w.Write([]byte(response))
+			Expect(err).ToNot(HaveOccurred())
+		}))
+		defer server.Close()
+
+		client := NewVMStatsClient(server.Client(), 0)
+		client.baseURLOverride = server.URL
+
+		results, err := client.FetchNodeVMStats(context.Background(), "unused")
+		Expect(err).ToNot(HaveOccurred())
+
+		block := results["ns1/vm1"].Stats.DomainStats.Block[0]
+
+		Expect(block.Name).To(Equal("vda"))
+		Expect(block.RdTimesSet).To(BeTrue())
+		Expect(block.RdTimes).To(Equal(uint64(1_000_000_000)))
+
+		histogram := block.LatencyHistograms.Read
+		Expect(histogram).ToNot(BeNil())
+
+		Expect(histogram.Name).To(Equal("read"))
+		Expect(histogram.Count).To(Equal(uint64(5)))
+		Expect(histogram.Buckets).To(HaveLen(1))
+
+		Expect(histogram.Buckets[0].UpperBound).To(Equal(uint64(1_000_000)))
+		Expect(histogram.Buckets[0].CumulativeCount).To(Equal(uint64(2)))
+	})
+
 	It("should handle partial failures in response", func() {
 		expected := map[string]*VMStatsResult{
 			"ns1/vm1": {
