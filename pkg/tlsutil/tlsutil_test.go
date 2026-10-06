@@ -190,10 +190,29 @@ var _ = Describe("TLSSecurityProfileToTLSConfig", func() {
 		).Error().ToNot(HaveOccurred())
 	})
 
-	It("should return error for Custom profile with missing groups", func() {
-		Expect(
-			TLSSecurityProfileToTLSConfig("Custom", "VersionTLS12", "ECDHE-RSA-AES128-GCM-SHA256", "", GinkgoLogr),
-		).Error().To(MatchError(ContainSubstring("groups")))
+	It("should leave CurvePreferences unset for Custom profile with omitted groups", func() {
+		fn, err := TLSSecurityProfileToTLSConfig(
+			"Custom", "VersionTLS12", "ECDHE-RSA-AES128-GCM-SHA256", "", GinkgoLogr,
+		)
+		Expect(err).ToNot(HaveOccurred())
+
+		cfg := &tls.Config{}
+		fn(cfg)
+
+		Expect(cfg.MinVersion).To(Equal(uint16(tls.VersionTLS12)))
+		Expect(cfg.CurvePreferences).To(BeEmpty())
+	})
+
+	It("should leave CurvePreferences unset for Custom profile with whitespace-only groups", func() {
+		fn, err := TLSSecurityProfileToTLSConfig(
+			"Custom", "VersionTLS12", "ECDHE-RSA-AES128-GCM-SHA256", " , , ", GinkgoLogr,
+		)
+		Expect(err).ToNot(HaveOccurred())
+
+		cfg := &tls.Config{}
+		fn(cfg)
+
+		Expect(cfg.CurvePreferences).To(BeEmpty())
 	})
 
 	It("should return error for Custom profile with whitespace-only ciphers", func() {
