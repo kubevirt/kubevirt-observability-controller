@@ -78,4 +78,11 @@ var _ = Describe("VMIReport", func() {
 		Expect(cr.ConstLabels).To(HaveKeyWithValue("interface", "eth0"))
 		Expect(cr.ConstLabels).To(HaveKeyWithValue("node", "node1"))
 	})
+
+	It("should render empty additional label values as <none>", func() {
+		cr := report.newCollectorResultWithLabels(gauge, 1.0, map[string]string{
+			"os_id": "",
+		})
+		Expect(cr.ConstLabels).To(HaveKeyWithValue("os_id", "<none>"))
+	})
 })

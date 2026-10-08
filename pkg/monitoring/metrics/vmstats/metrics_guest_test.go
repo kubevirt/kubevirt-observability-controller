@@ -42,8 +42,8 @@ var _ = Describe("Guest Metrics", func() {
 	})
 
 	It("should parse GuestGetOsInfo", func() {
-		report.Stats.GuestGetOsInfo = `{"id":"fedora","name":"Fedora Linux",` +
-			`"version":"38","kernel-release":"6.2.0","machine":"x86_64"}`
+		report.Stats.GuestGetOsInfo = `{"return":{"id":"fedora","name":"Fedora Linux",` +
+			`"version":"38","kernel-release":"6.2.0","machine":"x86_64"}}`
 
 		results := collectGuestMetrics(report)
 
@@ -61,7 +61,7 @@ var _ = Describe("Guest Metrics", func() {
 	})
 
 	It("should parse GuestGetHostName", func() {
-		report.Stats.GuestGetHostName = `{"host-name":"myhost"}`
+		report.Stats.GuestGetHostName = `{"return":{"host-name":"myhost"}}`
 		results := collectGuestMetrics(report)
 
 		var found bool
@@ -74,8 +74,22 @@ var _ = Describe("Guest Metrics", func() {
 		Expect(found).To(BeTrue())
 	})
 
+	It("should parse GuestGetTimezone", func() {
+		report.Stats.GuestGetTimezone = `{"return":{"zone":"UTC","offset":0}}`
+		results := collectGuestMetrics(report)
+
+		var found bool
+		for _, r := range results {
+			if r.Metric.GetOpts().Name == "kubevirt_vmi_guest_timezone" {
+				found = true
+				Expect(r.ConstLabels).To(HaveKeyWithValue("timezone", "UTC"))
+			}
+		}
+		Expect(found).To(BeTrue())
+	})
+
 	It("should parse GuestGetUsers and count them", func() {
-		report.Stats.GuestGetUsers = `[{"user":"root"},{"user":"testuser"}]`
+		report.Stats.GuestGetUsers = `{"return":[{"user":"root"},{"user":"testuser"}]}`
 		results := collectGuestMetrics(report)
 
 		var found bool
@@ -86,6 +100,47 @@ var _ = Describe("Guest Metrics", func() {
 			}
 		}
 		Expect(found).To(BeTrue())
+	})
+
+	It("should parse GuestNetworkGetInterfaces", func() {
+		report.Stats.GuestNetworkGetInterfaces = `{"return":[{"name":"eth0",` +
+			`"ip-addresses":[{"ip-address-type":"ipv4","ip-address":"10.0.2.2","prefix":24}],` +
+			`"hardware-address":"f6:98:90:b9:bd:70"}]}`
+		results := collectGuestMetrics(report)
+
+		var found bool
+		for _, r := range results {
+			if r.Metric.GetOpts().Name == "kubevirt_vmi_guest_interface_info" {
+				found = true
+				Expect(r.ConstLabels).To(HaveKeyWithValue("interface_name", "eth0"))
+				Expect(r.ConstLabels).To(HaveKeyWithValue("mac", "f6:98:90:b9:bd:70"))
+				Expect(r.ConstLabels).To(HaveKeyWithValue("ip_address", "10.0.2.2"))
+			}
+		}
+		Expect(found).To(BeTrue())
+	})
+
+	It("should parse GuestGetFsInfo into filesystem metrics", func() {
+		report.Stats.GuestGetFsInfo = `{"return":[{"name":"vda1","mountpoint":"/",` +
+			`"type":"ext4","used-bytes":123,"total-bytes":456}]}`
+		results := collectGuestMetrics(report)
+
+		var gotCapacity, gotUsed bool
+		for _, r := range results {
+			switch r.Metric.GetOpts().Name {
+			case "kubevirt_vmi_filesystem_capacity_bytes":
+				gotCapacity = true
+				Expect(r.Value).To(Equal(456.0))
+				Expect(r.ConstLabels).To(HaveKeyWithValue("disk_name", "vda1"))
+				Expect(r.ConstLabels).To(HaveKeyWithValue("mount_point", "/"))
+				Expect(r.ConstLabels).To(HaveKeyWithValue("file_system_type", "ext4"))
+			case "kubevirt_vmi_filesystem_used_bytes":
+				gotUsed = true
+				Expect(r.Value).To(Equal(123.0))
+			}
+		}
+		Expect(gotCapacity).To(BeTrue())
+		Expect(gotUsed).To(BeTrue())
 	})
 
 	It("should skip malformed JSON gracefully", func() {
