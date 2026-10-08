@@ -15,7 +15,7 @@
 # limitations under the License.
 
 export KUBEVIRT_PROVIDER=k8s-1.36
-export KUBEVIRT_TAG="${KUBEVIRT_TAG:-main}"
+export KUBEVIRT_COMMIT="${KUBEVIRT_COMMIT:-b57a20abfca4b9a641de97f1995266a7bd5197af}"
 export KUBEVIRT_MEMORY_SIZE="${KUBEVIRT_MEMORY_SIZE:-9216M}"
 export KUBEVIRT_DEPLOY_NP=true
 export KUBEVIRT_DEPLOY_PROMETHEUS=true
@@ -30,7 +30,10 @@ shift
 
 function kubevirt::install() {
   if [[ ! -d ${_base_dir}/_kubevirt ]]; then
-    git clone --depth 1 --branch "${KUBEVIRT_TAG}" https://github.com/kubevirt/kubevirt.git "${_base_dir}/_kubevirt"
+    git init --quiet "${_base_dir}/_kubevirt"
+    git -C "${_base_dir}/_kubevirt" remote add origin https://github.com/kubevirt/kubevirt.git
+    git -C "${_base_dir}/_kubevirt" fetch --quiet --depth 1 origin "${KUBEVIRT_COMMIT}"
+    git -C "${_base_dir}/_kubevirt" checkout --quiet FETCH_HEAD
   fi
 }
 
