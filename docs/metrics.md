@@ -71,6 +71,7 @@
 | pvc:kubevirt_vmsnapshot_labels:info | Recording rule | Gauge | Returns the labels of the persistent volume claims that are used for restoring virtual machines. |
 | vm:kubevirt_vmsnapshot_disks_restored:sum | Recording rule | Gauge | Returns the total number of virtual machine disks restored from the source virtual machine. |
 | vm:kubevirt_vmsnapshot_restored_bytes:sum | Recording rule | Gauge | Returns the amount of space in bytes restored from the source virtual machine. |
+| vmi:kubevirt_vmi_guest_device_driver_outdated:info | Recording rule | Gauge | One series per outdated (VMI, device) pair: the installed guest device driver version does not match the latest version known for that device and guest OS version. |
 | vmi:kubevirt_vmi_guest_queue_length:sum | Recording rule | Gauge | Guest queue length. |
 | vmi:kubevirt_vmi_memory_available_bytes:sum | Recording rule | Gauge | Sum of available memory bytes per VMI (aggregated by name, namespace). |
 | vmi:kubevirt_vmi_memory_headroom_ratio:sum | Recording rule | Gauge | Usable memory to available memory ratio per VMI (aggregated by name, namespace). |

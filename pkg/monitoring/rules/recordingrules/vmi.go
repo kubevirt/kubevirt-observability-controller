@@ -122,4 +122,20 @@ var vmiRecordingRules = []operatorrules.RecordingRule{
 				" sum by (name, namespace) (rate(kubevirt_vmi_memory_swap_out_traffic_bytes[30m]))",
 		),
 	},
+	{
+		MetricsOpts: operatormetrics.MetricOpts{
+			Name: "vmi:kubevirt_vmi_guest_device_driver_outdated:info",
+			Help: "One series per outdated (VMI, device) pair: the installed guest device driver version does not " +
+				"match the latest version known for that device and guest OS version.",
+		},
+		MetricType: operatormetrics.GaugeType,
+		Expr: intstr.FromString(
+			"max by (namespace, name, device_id, driver_name, driver_version, guest_os_version_id) (" +
+				"kubevirt_vmi_guest_device_driver_date_seconds " +
+				"and on (device_id, guest_os_version_id) " +
+				"kubevirt_guest_device_driver_latest_version_info " +
+				"unless on (device_id, guest_os_version_id, driver_version) " +
+				"kubevirt_guest_device_driver_latest_version_info)",
+		),
+	},
 }
