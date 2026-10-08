@@ -2,6 +2,7 @@
 
 | Name | Kind | Type | Description |
 |------|------|------|-------------|
+| kubevirt_guest_device_driver_latest_version_info | Metric | Gauge | Latest available guest device driver version for a device and guest OS version, as declared in the guest device drivers ConfigMap. |
 | kubevirt_vm_create_date_timestamp_seconds | Metric | Gauge | Virtual Machine creation timestamp. |
 | kubevirt_vm_disk_allocated_size_bytes | Metric | Gauge | Allocated disk size of a Virtual Machine in bytes. |
 | kubevirt_vm_error_status_last_transition_timestamp_seconds | Metric | Counter | Virtual Machine last transition timestamp to error status. |

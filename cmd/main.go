@@ -36,12 +36,16 @@ import (
 	_ "k8s.io/client-go/plugin/pkg/client/auth"
 
 	monitoringv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
+	k8sv1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	k6tv1 "kubevirt.io/api/core/v1"
 	instancetypev1beta1 "kubevirt.io/api/instancetype/v1beta1"
 	ctrl "sigs.k8s.io/controller-runtime"
+	ctrlcache "sigs.k8s.io/controller-runtime/pkg/cache"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 
 	"sigs.k8s.io/controller-runtime/pkg/certwatcher"
@@ -53,6 +57,7 @@ import (
 
 	"github.com/kubevirt/kubevirt-observability-controller/pkg/controller"
 	"github.com/kubevirt/kubevirt-observability-controller/pkg/monitoring/metrics"
+	"github.com/kubevirt/kubevirt-observability-controller/pkg/monitoring/metrics/devicedrivers"
 	"github.com/kubevirt/kubevirt-observability-controller/pkg/monitoring/metrics/vmstats"
 	"github.com/kubevirt/kubevirt-observability-controller/pkg/tlsutil"
 	// +kubebuilder:scaffold:imports
@@ -280,6 +285,25 @@ func main() {
 		setupLog.Info("metrics allowlist active", "count", len(registered))
 	}
 
+	podNamespace := getPodNamespace()
+	serviceAccountName := os.Getenv("POD_SERVICE_ACCOUNT")
+
+	if podNamespace == "" {
+		setupLog.Error(fmt.Errorf("POD_NAMESPACE not set"), "missing required environment variable")
+		os.Exit(1)
+	}
+
+	if serviceAccountName == "" {
+		setupLog.Error(fmt.Errorf("POD_SERVICE_ACCOUNT not set"), "missing required environment variable")
+		os.Exit(1)
+	}
+
+	driversCache := devicedrivers.NewDriversCache()
+	if err := devicedrivers.RegisterCollector(driversCache, allowlist); err != nil {
+		setupLog.Error(err, "unable to register guest device drivers collector")
+		os.Exit(1)
+	}
+
 	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{
 		Scheme:                 scheme,
 		Metrics:                metricsServerOptions,
@@ -287,6 +311,19 @@ func main() {
 		HealthProbeBindAddress: probeAddr,
 		LeaderElection:         enableLeaderElection,
 		LeaderElectionID:       "e0e374f1.kubevirt.io",
+		Cache: ctrlcache.Options{
+			ByObject: map[client.Object]ctrlcache.ByObject{
+				&k8sv1.ConfigMap{}: {
+					Namespaces: map[string]ctrlcache.Config{
+						podNamespace: {
+							FieldSelector: fields.OneTermEqualSelector(
+								"metadata.name", controller.GuestDeviceDriversConfigMapName,
+							),
+						},
+					},
+				},
+			},
+		},
 		// LeaderElectionReleaseOnCancel defines if the leader should step down voluntarily
 		// when the Manager ends. This requires the binary to immediately end when the
 		// Manager is stopped, otherwise, this setting is unsafe. Setting this significantly
@@ -301,19 +338,6 @@ func main() {
 	})
 	if err != nil {
 		setupLog.Error(err, "unable to start manager")
-		os.Exit(1)
-	}
-
-	podNamespace := getPodNamespace()
-	serviceAccountName := os.Getenv("POD_SERVICE_ACCOUNT")
-
-	if podNamespace == "" {
-		setupLog.Error(fmt.Errorf("POD_NAMESPACE not set"), "missing required environment variable")
-		os.Exit(1)
-	}
-
-	if serviceAccountName == "" {
-		setupLog.Error(fmt.Errorf("POD_SERVICE_ACCOUNT not set"), "missing required environment variable")
 		os.Exit(1)
 	}
 
@@ -343,6 +367,15 @@ func main() {
 		RecordingRulesAllowlist: recordingRulesAllowlist,
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "PrometheusRule")
+		os.Exit(1)
+	}
+
+	if err := (&controller.GuestDeviceDriversReconciler{
+		Client:    mgr.GetClient(),
+		Namespace: podNamespace,
+		Cache:     driversCache,
+	}).SetupWithManager(mgr); err != nil {
+		setupLog.Error(err, "unable to create controller", "controller", "GuestDeviceDrivers")
 		os.Exit(1)
 	}
 
