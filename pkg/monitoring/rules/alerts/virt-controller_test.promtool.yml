@@ -1,0 +1,38 @@
+# Rules are generated with the KubeVirt install namespace set to ci.
+rule_files:
+- rules.yaml
+evaluation_interval: 1m
+group_eval_order:
+- recordingRules.rules
+- alerts.rules
+tests:
+- name: VirtControllerDown respects its firing delay
+  interval: 1m
+  input_series:
+  - series: kube_pod_status_phase{namespace="ci", pod="virt-controller-1", phase="Running"}
+    values: 0+0x20
+  alert_rule_test:
+  - eval_time: 8m
+    alertname: VirtControllerDown
+    exp_alerts: []
+  - eval_time: 10m
+    alertname: VirtControllerDown
+    exp_alerts:
+    - exp_annotations:
+        summary: No running virt-controller was detected for the last 10 min.
+        runbook_url: https://kubevirt.io/monitoring/runbooks/VirtControllerDown
+      exp_labels:
+        severity: critical
+        operator_health_impact: critical
+        kubernetes_operator_part_of: kubevirt
+        kubernetes_operator_component: kubevirt
+        namespace: ci
+- name: VirtControllerDown remains inactive when healthy
+  interval: 1m
+  input_series:
+  - series: kube_pod_status_phase{namespace="ci", pod="virt-controller-1", phase="Running"}
+    values: 1+0x20
+  alert_rule_test:
+  - eval_time: 10m
+    alertname: VirtControllerDown
+    exp_alerts: []

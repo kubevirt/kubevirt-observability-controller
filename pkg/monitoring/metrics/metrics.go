@@ -22,7 +22,11 @@ import (
 	"sync/atomic"
 
 	"github.com/rhobs/operator-observability-toolkit/pkg/operatormetrics"
+	"k8s.io/client-go/tools/cache"
 	ctrlmetrics "sigs.k8s.io/controller-runtime/pkg/metrics"
+
+	"github.com/kubevirt/kubevirt-observability-controller/pkg/monitoring/metrics/vm"
+	"github.com/kubevirt/kubevirt-observability-controller/pkg/monitoring/metrics/vmi"
 )
 
 var (
@@ -50,9 +54,20 @@ func SetupMetrics(metricsStores *Stores, metricsIndexers *Indexers, allowlist ma
 	operatormetrics.Unregister = ctrlmetrics.Registry.Unregister
 
 	allCollectors := []operatormetrics.Collector{
-		MigrationStatsCollector,
+		vmi.NewMigrationStatsCollector(func() cache.Store {
+			idx := getIndexers()
+			if idx == nil {
+				return nil
+			}
+			return idx.VMIMigration
+		}),
 		VMIStatsCollector,
 		VMStatsCollector,
+		vm.NewVMSnapshotStatsCollector(inventoryStore(func(s *Stores) cache.Store { return s.VMSnapshot })),
+		vm.NewVMRestoreStatsCollector(inventoryStore(func(s *Stores) cache.Store { return s.VMRestore })),
+		vm.NewVMExportStatsCollector(inventoryStore(func(s *Stores) cache.Store { return s.VMExport })),
+		vm.NewVMCloneStatsCollector(inventoryStore(func(s *Stores) cache.Store { return s.VMClone })),
+		vm.NewVMPoolStatsCollector(inventoryStore(func(s *Stores) cache.Store { return s.VMPool })),
 	}
 
 	if allowlist == nil {
@@ -115,4 +130,14 @@ func SetStores(s *Stores, i *Indexers) {
 
 func ListMetrics() []operatormetrics.Metric {
 	return operatormetrics.ListMetrics()
+}
+
+func inventoryStore(selectStore func(*Stores) cache.Store) func() cache.Store {
+	return func() cache.Store {
+		stores := getStores()
+		if stores == nil {
+			return nil
+		}
+		return selectStore(stores)
+	}
 }

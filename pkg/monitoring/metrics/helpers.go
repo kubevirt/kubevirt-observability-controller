@@ -26,12 +26,13 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/tools/cache"
-
 	k6tv1 "kubevirt.io/api/core/v1"
+
+	"github.com/kubevirt/kubevirt-observability-controller/pkg/monitoring/metrics/internal/inventory"
 )
 
 const (
-	None      = ""
+	None      = inventory.None
 	Other     = "<other>"
 	ModelNone = "<none>"
 
