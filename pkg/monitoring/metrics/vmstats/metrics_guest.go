@@ -23,13 +23,16 @@ import (
 	"fmt"
 
 	"github.com/rhobs/operator-observability-toolkit/pkg/operatormetrics"
+	ctrl "sigs.k8s.io/controller-runtime"
 )
+
+var guestLog = ctrl.Log.WithName("vmstats-guest")
 
 var (
 	guestMetricsList = []operatormetrics.Metric{
 		guestOsInfo, guestHostname, guestTimezone,
 		guestUserCount, guestDiskTotalBytes, guestDiskUsedBytes,
-		guestInterfaceInfo,
+		guestInterfaceInfo, guestDeviceDriverDate,
 	}
 
 	guestOsInfo = operatormetrics.NewGauge(operatormetrics.MetricOpts{
@@ -60,6 +63,11 @@ var (
 		Name: "kubevirt_vmi_guest_interface_info",
 		Help: "Guest network interface information from the guest agent.",
 	})
+	guestDeviceDriverDate = operatormetrics.NewGauge(operatormetrics.MetricOpts{
+		Name: "kubevirt_vmi_guest_device_driver_date_seconds",
+		Help: "Release date of the driver of a guest device, in seconds since the epoch, " +
+			"as reported by the guest agent.",
+	})
 )
 
 func collectGuestMetrics(report *VMIReport) []operatormetrics.CollectorResult {
@@ -70,6 +78,7 @@ func collectGuestMetrics(report *VMIReport) []operatormetrics.CollectorResult {
 	crs = append(crs, collectGuestUsers(report)...)
 	crs = append(crs, collectGuestDiskStats(report)...)
 	crs = append(crs, collectGuestInterfaces(report)...)
+	crs = append(crs, collectGuestDevices(report)...)
 	return crs
 }
 
@@ -201,4 +210,90 @@ func collectGuestInterfaces(report *VMIReport) []operatormetrics.CollectorResult
 		}))
 	}
 	return crs
+}
+
+func collectGuestDevices(report *VMIReport) []operatormetrics.CollectorResult {
+	if report.Stats.GuestGetDevices == "" {
+		return nil
+	}
+
+	devices, err := parseGuestDevices(report.Stats.GuestGetDevices)
+	if err != nil {
+		guestLog.V(2).Info("discarding unparseable guest device data",
+			"namespace", report.VMI.Namespace, "name", report.VMI.Name, "error", err)
+		return nil
+	}
+
+	osVersionID := report.VMI.Status.GuestOSInfo.VersionID
+
+	var crs []operatormetrics.CollectorResult
+	seen := make(map[deviceKey]struct{}, len(devices))
+	for _, d := range devices {
+		if d.DriverDate == nil || *d.DriverDate <= 0 {
+			continue
+		}
+		key := deviceKey{
+			name:    d.DriverName,
+			version: d.DriverVersion,
+		}
+		if d.ID != nil {
+			key.deviceID = formatPCIID(d.ID.DeviceID)
+		}
+
+		if _, dup := seen[key]; dup {
+			guestLog.V(2).Info("dropping guest device with a duplicate label set",
+				"namespace", report.VMI.Namespace, "name", report.VMI.Name,
+				"driver_name", key.name, "driver_version", key.version, "device_id", key.deviceID)
+			continue
+		}
+		seen[key] = struct{}{}
+
+		crs = append(crs, report.newCollectorResultWithLabels(
+			guestDeviceDriverDate, nanosecondsToSeconds(uint64(*d.DriverDate)), map[string]string{
+				"driver_name":         key.name,
+				"driver_version":      key.version,
+				"device_id":           key.deviceID,
+				"guest_os_version_id": osVersionID,
+			}))
+	}
+	return crs
+}
+
+type guestDevice struct {
+	DriverName    string `json:"driver-name"`
+	DriverDate    *int64 `json:"driver-date"`
+	DriverVersion string `json:"driver-version"`
+	ID            *struct {
+		DeviceID *int64 `json:"device-id"`
+	} `json:"id"`
+}
+
+func parseGuestDevices(payload string) ([]guestDevice, error) {
+	body := json.RawMessage(payload)
+
+	var envelope struct {
+		Return json.RawMessage `json:"return"`
+	}
+	if err := json.Unmarshal([]byte(payload), &envelope); err == nil && envelope.Return != nil {
+		body = envelope.Return
+	}
+
+	var devices []guestDevice
+	if err := json.Unmarshal(body, &devices); err != nil {
+		return nil, err
+	}
+	return devices, nil
+}
+
+type deviceKey struct {
+	name     string
+	version  string
+	deviceID string
+}
+
+func formatPCIID(id *int64) string {
+	if id == nil {
+		return ""
+	}
+	return fmt.Sprintf("%04x", *id)
 }
