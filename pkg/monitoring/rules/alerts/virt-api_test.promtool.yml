@@ -1,0 +1,38 @@
+# Rules are generated with the KubeVirt install namespace set to ci.
+rule_files:
+- rules.yaml
+evaluation_interval: 1m
+group_eval_order:
+- recordingRules.rules
+- alerts.rules
+tests:
+- name: VirtAPIDown respects its firing delay
+  interval: 1m
+  input_series:
+  - series: up{namespace="ci", pod="virt-api-1"}
+    values: 0+0x20
+  alert_rule_test:
+  - eval_time: 8m
+    alertname: VirtAPIDown
+    exp_alerts: []
+  - eval_time: 10m
+    alertname: VirtAPIDown
+    exp_alerts:
+    - exp_annotations:
+        summary: All virt-api servers are down.
+        runbook_url: https://kubevirt.io/monitoring/runbooks/VirtAPIDown
+      exp_labels:
+        severity: critical
+        operator_health_impact: critical
+        kubernetes_operator_part_of: kubevirt
+        kubernetes_operator_component: kubevirt
+        namespace: ci
+- name: VirtAPIDown remains inactive when healthy
+  interval: 1m
+  input_series:
+  - series: up{namespace="ci", pod="virt-api-1"}
+    values: 1+0x20
+  alert_rule_test:
+  - eval_time: 10m
+    alertname: VirtAPIDown
+    exp_alerts: []
