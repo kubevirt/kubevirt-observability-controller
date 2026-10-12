@@ -29,6 +29,41 @@ import (
 )
 
 var _ = Describe("VMStatsClient", func() {
+	It("should name request categories exactly as virt-handler does", func() {
+		var gotCategories map[string]json.RawMessage
+
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			var raw struct {
+				VMIs map[string]map[string]json.RawMessage `json:"vmis"`
+			}
+			Expect(json.NewDecoder(r.Body).Decode(&raw)).To(Succeed())
+			gotCategories = raw.VMIs["ns1/vm1"]
+
+			w.Header().Set("Content-Type", "application/json")
+			Expect(json.NewEncoder(w).Encode(map[string]*VMStatsResult{})).To(Succeed())
+		}))
+		defer server.Close()
+
+		client := NewVMStatsClient(server.Client(), 0)
+		client.baseURLOverride = server.URL
+
+		requests := map[string]*VMStatsRequest{
+			"ns1/vm1": {
+				DomainStats:               enabled,
+				GuestGetFsInfo:            enabled,
+				GuestGetOsInfo:            enabled,
+				GuestNetworkGetInterfaces: enabled,
+			},
+		}
+		_, err := client.FetchNodeVMStats(context.Background(), "unused", requests)
+		Expect(err).ToNot(HaveOccurred())
+
+		Expect(gotCategories).To(HaveKey("domainStats"))
+		Expect(gotCategories).To(HaveKey("guestGetFsInfo"))
+		Expect(gotCategories).To(HaveKey("guestGetOsInfo"))
+		Expect(gotCategories).To(HaveKey("guestNetworkGetInterfaces"))
+	})
+
 	It("should fetch and parse bulk VMStats", func() {
 		expected := map[string]*VMStatsResult{
 			"ns1/vm1": {
@@ -49,8 +84,28 @@ var _ = Describe("VMStatsClient", func() {
 			},
 		}
 
+		requests := map[string]*VMStatsRequest{
+			"ns1/vm1": {DomainStats: enabled, GuestGetUsers: enabled},
+			"ns1/vm2": {DomainStats: enabled, GuestGetFsInfo: enabled},
+		}
+
 		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			Expect(r.URL.Path).To(Equal("/v1/vmstats"))
+			Expect(r.Method).To(Equal(http.MethodPost))
+			Expect(r.Header.Get("Content-Type")).To(Equal("application/json"))
+
+			var body vmStatsRequestBody
+			Expect(json.NewDecoder(r.Body).Decode(&body)).To(Succeed())
+
+			// The client is a dumb serializer: it must send exactly the
+			// per-VMI requests it was handed, not pick categories itself.
+			Expect(body.VMIs).To(HaveKey("ns1/vm1"))
+			Expect(body.VMIs).To(HaveKey("ns1/vm2"))
+			Expect(body.VMIs["ns1/vm1"].GuestGetUsers).ToNot(BeNil())
+			Expect(body.VMIs["ns1/vm1"].GuestGetFsInfo).To(BeNil())
+			Expect(body.VMIs["ns1/vm2"].GuestGetFsInfo).ToNot(BeNil())
+			Expect(body.VMIs["ns1/vm2"].GuestGetUsers).To(BeNil())
+
 			w.Header().Set("Content-Type", "application/json")
 			Expect(json.NewEncoder(w).Encode(expected)).To(Succeed())
 		}))
@@ -59,7 +114,7 @@ var _ = Describe("VMStatsClient", func() {
 		client := NewVMStatsClient(server.Client(), 0)
 		client.baseURLOverride = server.URL
 
-		results, err := client.FetchNodeVMStats(context.Background(), "unused")
+		results, err := client.FetchNodeVMStats(context.Background(), "unused", requests)
 		Expect(err).ToNot(HaveOccurred())
 		Expect(results).To(HaveLen(2))
 		Expect(results["ns1/vm1"].Stats.DomainStats.Name).To(Equal("ns1_vm1"))
@@ -87,7 +142,10 @@ var _ = Describe("VMStatsClient", func() {
 		client := NewVMStatsClient(server.Client(), 0)
 		client.baseURLOverride = server.URL
 
-		results, err := client.FetchNodeVMStats(context.Background(), "unused")
+		results, err := client.FetchNodeVMStats(context.Background(), "unused", map[string]*VMStatsRequest{
+			"ns1/vm1": {DomainStats: enabled},
+			"ns1/vm2": {DomainStats: enabled},
+		})
 		Expect(err).ToNot(HaveOccurred())
 		Expect(results).To(HaveLen(2))
 		Expect(results["ns1/vm1"].Stats).ToNot(BeNil())
@@ -105,7 +163,9 @@ var _ = Describe("VMStatsClient", func() {
 		client := NewVMStatsClient(server.Client(), 0)
 		client.baseURLOverride = server.URL
 
-		_, err := client.FetchNodeVMStats(context.Background(), "unused")
+		_, err := client.FetchNodeVMStats(context.Background(), "unused", map[string]*VMStatsRequest{
+			"ns1/vm1": {DomainStats: enabled},
+		})
 		Expect(err).To(HaveOccurred())
 		Expect(err.Error()).To(ContainSubstring("403"))
 	})
@@ -119,7 +179,9 @@ var _ = Describe("VMStatsClient", func() {
 		client := NewVMStatsClient(server.Client(), 0)
 		client.baseURLOverride = server.URL
 
-		_, err := client.FetchNodeVMStats(context.Background(), "unused")
+		_, err := client.FetchNodeVMStats(context.Background(), "unused", map[string]*VMStatsRequest{
+			"ns1/vm1": {DomainStats: enabled},
+		})
 		Expect(err).To(HaveOccurred())
 	})
 

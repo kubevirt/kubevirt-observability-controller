@@ -36,6 +36,7 @@ type VMStats struct {
 	GuestGetLoad              string      `json:"GuestGetLoad"`
 	GuestGetCpuStats          string      `json:"GuestGetCpuStats"`
 	GuestGetDiskStats         string      `json:"GuestGetDiskStats"`
+	GuestGetFsInfo            string      `json:"GuestGetFsInfo"`
 	GuestGetTime              string      `json:"GuestGetTime"`
 	GuestGetVcpus             string      `json:"GuestGetVcpus"`
 	GuestGetMemoryBlockInfo   string      `json:"GuestGetMemoryBlockInfo"`

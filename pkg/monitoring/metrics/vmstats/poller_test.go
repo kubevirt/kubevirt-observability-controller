@@ -166,6 +166,56 @@ var _ = Describe("Poller", func() {
 			Expect(names).To(HaveKey("ns1_vm2"))
 		})
 
+		It("should resolve stats requests per VMI from guest OS info", func() {
+			var captured vmStatsRequestBody
+
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				Expect(json.NewDecoder(r.Body).Decode(&captured)).To(Succeed())
+				w.Header().Set("Content-Type", "application/json")
+				Expect(json.NewEncoder(w).Encode(map[string]*VMStatsResult{})).To(Succeed())
+			}))
+			defer server.Close()
+
+			vmiStore := cache.NewStore(cache.MetaNamespaceKeyFunc)
+			Expect(vmiStore.Add(&k6tv1.VirtualMachineInstance{
+				ObjectMeta: metav1.ObjectMeta{Name: "win", Namespace: "ns1"},
+				Status: k6tv1.VirtualMachineInstanceStatus{
+					NodeName:    "node1",
+					GuestOSInfo: k6tv1.VirtualMachineInstanceGuestOSInfo{ID: "mswindows"},
+				},
+			})).To(Succeed())
+			Expect(vmiStore.Add(&k6tv1.VirtualMachineInstance{
+				ObjectMeta: metav1.ObjectMeta{Name: "lin", Namespace: "ns1"},
+				Status: k6tv1.VirtualMachineInstanceStatus{
+					NodeName:    "node1",
+					GuestOSInfo: k6tv1.VirtualMachineInstanceGuestOSInfo{ID: "rhel"},
+				},
+			})).To(Succeed())
+
+			podStore := cache.NewStore(cache.MetaNamespaceKeyFunc)
+			Expect(podStore.Add(&k8sv1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "virt-handler-abc", Namespace: "kubevirt",
+					Labels: map[string]string{"kubevirt.io": "virt-handler"},
+				},
+				Spec:   k8sv1.PodSpec{NodeName: "node1"},
+				Status: k8sv1.PodStatus{PodIP: "10.0.0.5", Phase: k8sv1.PodRunning},
+			})).To(Succeed())
+
+			vmClient := NewVMStatsClient(server.Client(), 0)
+			vmClient.baseURLOverride = server.URL
+
+			p := NewPoller(PollerConfig{MaxConcurrent: 10}, NewStatsCache(), vmClient, vmiStore, podStore)
+			p.pollOnce()
+
+			Expect(captured.VMIs).To(HaveKey("ns1/win"))
+			Expect(captured.VMIs).To(HaveKey("ns1/lin"))
+			Expect(captured.VMIs["ns1/win"].GuestGetUsers).ToNot(BeNil())
+			Expect(captured.VMIs["ns1/win"].GuestNetworkGetInterfaces).To(BeNil())
+			Expect(captured.VMIs["ns1/lin"].GuestNetworkGetInterfaces).ToNot(BeNil())
+			Expect(captured.VMIs["ns1/lin"].GuestGetUsers).To(BeNil())
+		})
+
 		It("should skip VMIs with errors in bulk response", func() {
 			bulkResponse := map[string]*VMStatsResult{
 				"ns1/vm1": {

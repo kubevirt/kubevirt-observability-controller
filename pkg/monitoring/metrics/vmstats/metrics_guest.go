@@ -28,7 +28,7 @@ import (
 var (
 	guestMetricsList = []operatormetrics.Metric{
 		guestOsInfo, guestHostname, guestTimezone,
-		guestUserCount, guestDiskTotalBytes, guestDiskUsedBytes,
+		guestUserCount, filesystemCapacityBytes, filesystemUsedBytes,
 		guestInterfaceInfo,
 	}
 
@@ -48,13 +48,13 @@ var (
 		Name: "kubevirt_vmi_guest_user_count",
 		Help: "Number of logged-in users in the guest.",
 	})
-	guestDiskTotalBytes = operatormetrics.NewGauge(operatormetrics.MetricOpts{
-		Name: "kubevirt_vmi_guest_disk_total_bytes",
-		Help: "Total disk size in bytes as reported by the guest agent.",
+	filesystemCapacityBytes = operatormetrics.NewGauge(operatormetrics.MetricOpts{
+		Name: "kubevirt_vmi_filesystem_capacity_bytes",
+		Help: "Total VM filesystem capacity in bytes.",
 	})
-	guestDiskUsedBytes = operatormetrics.NewGauge(operatormetrics.MetricOpts{
-		Name: "kubevirt_vmi_guest_disk_used_bytes",
-		Help: "Used disk size in bytes as reported by the guest agent.",
+	filesystemUsedBytes = operatormetrics.NewGauge(operatormetrics.MetricOpts{
+		Name: "kubevirt_vmi_filesystem_used_bytes",
+		Help: "Used VM filesystem capacity in bytes.",
 	})
 	guestInterfaceInfo = operatormetrics.NewGauge(operatormetrics.MetricOpts{
 		Name: "kubevirt_vmi_guest_interface_info",
@@ -68,13 +68,27 @@ func collectGuestMetrics(report *VMIReport) []operatormetrics.CollectorResult {
 	crs = append(crs, collectGuestHostname(report)...)
 	crs = append(crs, collectGuestTimezone(report)...)
 	crs = append(crs, collectGuestUsers(report)...)
-	crs = append(crs, collectGuestDiskStats(report)...)
+	crs = append(crs, collectGuestFilesystems(report)...)
 	crs = append(crs, collectGuestInterfaces(report)...)
 	return crs
 }
 
+func guestReturn(payload string) json.RawMessage {
+	if payload == "" {
+		return nil
+	}
+	var env struct {
+		Return json.RawMessage `json:"return"`
+	}
+	if err := json.Unmarshal([]byte(payload), &env); err != nil {
+		return nil
+	}
+	return env.Return
+}
+
 func collectGuestOsInfo(report *VMIReport) []operatormetrics.CollectorResult {
-	if report.Stats.GuestGetOsInfo == "" {
+	raw := guestReturn(report.Stats.GuestGetOsInfo)
+	if raw == nil {
 		return nil
 	}
 	var info struct {
@@ -84,7 +98,7 @@ func collectGuestOsInfo(report *VMIReport) []operatormetrics.CollectorResult {
 		KernelRelease string `json:"kernel-release"`
 		Machine       string `json:"machine"`
 	}
-	if err := json.Unmarshal([]byte(report.Stats.GuestGetOsInfo), &info); err != nil {
+	if err := json.Unmarshal(raw, &info); err != nil {
 		return nil
 	}
 	return []operatormetrics.CollectorResult{
@@ -99,13 +113,14 @@ func collectGuestOsInfo(report *VMIReport) []operatormetrics.CollectorResult {
 }
 
 func collectGuestHostname(report *VMIReport) []operatormetrics.CollectorResult {
-	if report.Stats.GuestGetHostName == "" {
+	raw := guestReturn(report.Stats.GuestGetHostName)
+	if raw == nil {
 		return nil
 	}
 	var info struct {
 		HostName string `json:"host-name"`
 	}
-	if err := json.Unmarshal([]byte(report.Stats.GuestGetHostName), &info); err != nil {
+	if err := json.Unmarshal(raw, &info); err != nil {
 		return nil
 	}
 	return []operatormetrics.CollectorResult{
@@ -116,14 +131,15 @@ func collectGuestHostname(report *VMIReport) []operatormetrics.CollectorResult {
 }
 
 func collectGuestTimezone(report *VMIReport) []operatormetrics.CollectorResult {
-	if report.Stats.GuestGetTimezone == "" {
+	raw := guestReturn(report.Stats.GuestGetTimezone)
+	if raw == nil {
 		return nil
 	}
 	var info struct {
 		Zone   string `json:"zone"`
 		Offset int    `json:"offset"`
 	}
-	if err := json.Unmarshal([]byte(report.Stats.GuestGetTimezone), &info); err != nil {
+	if err := json.Unmarshal(raw, &info); err != nil {
 		return nil
 	}
 	return []operatormetrics.CollectorResult{
@@ -135,11 +151,12 @@ func collectGuestTimezone(report *VMIReport) []operatormetrics.CollectorResult {
 }
 
 func collectGuestUsers(report *VMIReport) []operatormetrics.CollectorResult {
-	if report.Stats.GuestGetUsers == "" {
+	raw := guestReturn(report.Stats.GuestGetUsers)
+	if raw == nil {
 		return nil
 	}
 	var users []json.RawMessage
-	if err := json.Unmarshal([]byte(report.Stats.GuestGetUsers), &users); err != nil {
+	if err := json.Unmarshal(raw, &users); err != nil {
 		return nil
 	}
 	return []operatormetrics.CollectorResult{
@@ -147,35 +164,39 @@ func collectGuestUsers(report *VMIReport) []operatormetrics.CollectorResult {
 	}
 }
 
-func collectGuestDiskStats(report *VMIReport) []operatormetrics.CollectorResult {
-	if report.Stats.GuestGetDiskStats == "" {
+func collectGuestFilesystems(report *VMIReport) []operatormetrics.CollectorResult {
+	raw := guestReturn(report.Stats.GuestGetFsInfo)
+	if raw == nil {
 		return nil
 	}
-	var disks []struct {
+	var filesystems []struct {
 		Name       string `json:"name"`
 		Mountpoint string `json:"mountpoint"`
+		Type       string `json:"type"`
 		Total      uint64 `json:"total-bytes"`
 		Used       uint64 `json:"used-bytes"`
 	}
-	if err := json.Unmarshal([]byte(report.Stats.GuestGetDiskStats), &disks); err != nil {
+	if err := json.Unmarshal(raw, &filesystems); err != nil {
 		return nil
 	}
 	var crs []operatormetrics.CollectorResult
-	for _, d := range disks {
+	for _, fs := range filesystems {
 		labels := map[string]string{
-			"disk_name":  d.Name,
-			"mountpoint": d.Mountpoint,
+			"disk_name":        fs.Name,
+			"mount_point":      fs.Mountpoint,
+			"file_system_type": fs.Type,
 		}
 		crs = append(crs,
-			report.newCollectorResultWithLabels(guestDiskTotalBytes, float64(d.Total), labels),
-			report.newCollectorResultWithLabels(guestDiskUsedBytes, float64(d.Used), labels),
+			report.newCollectorResultWithLabels(filesystemCapacityBytes, float64(fs.Total), labels),
+			report.newCollectorResultWithLabels(filesystemUsedBytes, float64(fs.Used), labels),
 		)
 	}
 	return crs
 }
 
 func collectGuestInterfaces(report *VMIReport) []operatormetrics.CollectorResult {
-	if report.Stats.GuestNetworkGetInterfaces == "" {
+	raw := guestReturn(report.Stats.GuestNetworkGetInterfaces)
+	if raw == nil {
 		return nil
 	}
 	var ifaces []struct {
@@ -185,7 +206,7 @@ func collectGuestInterfaces(report *VMIReport) []operatormetrics.CollectorResult
 			Address string `json:"ip-address"`
 		} `json:"ip-addresses"`
 	}
-	if err := json.Unmarshal([]byte(report.Stats.GuestNetworkGetInterfaces), &ifaces); err != nil {
+	if err := json.Unmarshal(raw, &ifaces); err != nil {
 		return nil
 	}
 	var crs []operatormetrics.CollectorResult

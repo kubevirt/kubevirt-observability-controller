@@ -114,7 +114,12 @@ func (p *Poller) pollOnce() {
 			ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 			defer cancel()
 
-			results, err := p.client.FetchNodeVMStats(ctx, podIP)
+			requests := make(map[string]*VMStatsRequest, len(vmiLookup))
+			for key, vmi := range vmiLookup {
+				requests[key] = resolveVMStatsRequest(vmi)
+			}
+
+			results, err := p.client.FetchNodeVMStats(ctx, podIP, requests)
 			if err != nil {
 				pollerLog.V(4).Info("failed to fetch node vmstats", "node", node, "error", err)
 				return
