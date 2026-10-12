@@ -1,0 +1,43 @@
+rule_files:
+  - rules.yaml
+
+evaluation_interval: 1m
+
+tests:
+  - name: outdated driver is recorded
+    interval: 1m
+    input_series:
+      - series: 'kubevirt_vmi_guest_device_driver_date_seconds{namespace="default",name="vm-old",device_id="VEN_1AF4&DEV_1041",driver_name="netkvm",driver_version="100.85.104.16700",guest_os_version_id="9"}'
+        values: '1700000000x5'
+      - series: 'kubevirt_guest_device_driver_latest_version_info{device_id="VEN_1AF4&DEV_1041",driver_version="100.95.104.26200",guest_os_version_id="9"}'
+        values: '1x5'
+    promql_expr_test:
+      - expr: vmi:kubevirt_vmi_guest_device_driver_outdated:info
+        eval_time: 5m
+        exp_samples:
+          - labels: 'vmi:kubevirt_vmi_guest_device_driver_outdated:info{device_id="VEN_1AF4&DEV_1041",driver_name="netkvm",driver_version="100.85.104.16700",guest_os_version_id="9",name="vm-old",namespace="default"}'
+            value: 1700000000
+
+  - name: up-to-date driver is not recorded
+    interval: 1m
+    input_series:
+      - series: 'kubevirt_vmi_guest_device_driver_date_seconds{namespace="default",name="vm-current",device_id="VEN_1AF4&DEV_1041",driver_name="netkvm",driver_version="100.95.104.26200",guest_os_version_id="9"}'
+        values: '1700000000x5'
+      - series: 'kubevirt_guest_device_driver_latest_version_info{device_id="VEN_1AF4&DEV_1041",driver_version="100.95.104.26200",guest_os_version_id="9"}'
+        values: '1x5'
+    promql_expr_test:
+      - expr: vmi:kubevirt_vmi_guest_device_driver_outdated:info
+        eval_time: 5m
+        exp_samples: []
+
+  - name: device absent from the catalog is not recorded
+    interval: 1m
+    input_series:
+      - series: 'kubevirt_vmi_guest_device_driver_date_seconds{namespace="default",name="vm-unknown",device_id="VEN_DEAD&DEV_BEEF",driver_name="mysterykvm",driver_version="1.0.0.0",guest_os_version_id="9"}'
+        values: '1700000000x5'
+      - series: 'kubevirt_guest_device_driver_latest_version_info{device_id="VEN_1AF4&DEV_1041",driver_version="100.95.104.26200",guest_os_version_id="9"}'
+        values: '1x5'
+    promql_expr_test:
+      - expr: vmi:kubevirt_vmi_guest_device_driver_outdated:info
+        eval_time: 5m
+        exp_samples: []
