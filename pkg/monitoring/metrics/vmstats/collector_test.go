@@ -69,4 +69,21 @@ var _ = Describe("Collector", func() {
 		results := collector.CollectCallback()
 		Expect(results).To(BeEmpty())
 	})
+
+	It("should register the block latency custom collector when allowed", func() {
+		cache := NewStatsCache()
+
+		err := RegisterCollector(
+			cache,
+			map[string]bool{
+				blockIOLatencyMetricName: true,
+			},
+		)
+		Expect(err).ToNot(HaveOccurred())
+
+		DeferCleanup(func() {
+			operatormetrics.Unregister(newBlockLatencyCollector(cache))
+		})
+	})
+
 })
