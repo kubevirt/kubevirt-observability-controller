@@ -214,4 +214,44 @@ var _ = Describe("Helper functions", func() {
 			Expect(FetchResourceName("key", nil)).To(Equal(Other))
 		})
 	})
+
+	Describe("FormatDeviceID", func() {
+		It("should render the guest agent decimal ID as hex without a prefix", func() {
+			Expect(FormatDeviceID(4161)).To(Equal("1041"))
+		})
+
+		It("should render the hex digits in upper case", func() {
+			Expect(FormatDeviceID(4170)).To(Equal("104A"))
+		})
+	})
+
+	Describe("NormalizeDeviceID", func() {
+		DescribeTable("should render a written device ID the way the metric labels it",
+			func(written, expected string) {
+				Expect(NormalizeDeviceID(written)).To(Equal(expected))
+			},
+			Entry("already canonical", "1041", "1041"),
+			Entry("lower case", "104a", "104A"),
+			Entry("0x prefix", "0x104A", "104A"),
+			Entry("0X prefix", "0X104a", "104A"),
+			Entry("surrounding spaces", "  1041  ", "1041"),
+			Entry("leading zeros", "0041", "41"),
+		)
+
+		It("should agree with FormatDeviceID on what the canonical form is", func() {
+			Expect(NormalizeDeviceID(FormatDeviceID(4170))).To(Equal(FormatDeviceID(4170)))
+		})
+
+		DescribeTable("should reject anything that is not a device ID",
+			func(written string) {
+				_, err := NormalizeDeviceID(written)
+				Expect(err).To(MatchError(ContainSubstring(written)))
+			},
+			Entry("empty", ""),
+			Entry("not hex", "virtio-net"),
+			Entry("embedded space", "10 41"),
+			Entry("negative", "-1041"),
+			Entry("wider than 16 bits", "11041"),
+		)
+	})
 })
