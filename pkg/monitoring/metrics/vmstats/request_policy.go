@@ -19,6 +19,8 @@ Copyright The KubeVirt Authors.
 package vmstats
 
 import (
+	"regexp"
+	"strconv"
 	"strings"
 
 	k6tv1 "kubevirt.io/api/core/v1"
@@ -35,6 +37,7 @@ const (
 	catGuestGetUsers             category = "guestGetUsers"
 	catGuestGetFsInfo            category = "guestGetFsInfo"
 	catGuestNetworkGetInterfaces category = "guestNetworkGetInterfaces"
+	catGuestGetDevices           category = "guestGetDevices"
 )
 
 var allCategories = []category{
@@ -46,6 +49,7 @@ var allCategories = []category{
 	catGuestGetUsers,
 	catGuestGetFsInfo,
 	catGuestNetworkGetInterfaces,
+	catGuestGetDevices,
 }
 
 var libvirtCategories = []category{
@@ -65,11 +69,15 @@ var osFamilyCategories = map[string][]category{
 	"linux":   {catGuestNetworkGetInterfaces},
 }
 
+const windowsFamily = "windows"
+
+var guestGetDevicesMinAgent = agentVersion{major: 5, minor: 2, known: true}
+
 // resolveVMStatsRequest decides which stats categories to request for a single
 // VMI. libvirt categories are always requested, guest-agent categories are
 // added only when the guest agent has reported an OS, OS-family specific are
 // added based on that returned value.
-func resolveVMStatsRequest(vmi *k6tv1.VirtualMachineInstance) *VMStatsRequest {
+func resolveVMStatsRequest(vmi *k6tv1.VirtualMachineInstance, agentVer string) *VMStatsRequest {
 	set := make(map[category]bool)
 	addCategories(set, libvirtCategories)
 
@@ -79,10 +87,52 @@ func resolveVMStatsRequest(vmi *k6tv1.VirtualMachineInstance) *VMStatsRequest {
 		return buildRequest(set)
 	}
 
+	family := osFamily(id)
 	addCategories(set, guestCommonCategories)
-	addCategories(set, osFamilyCategories[osFamily(id)])
+	addCategories(set, osFamilyCategories[family])
+
+	if family == windowsFamily && parseAgentVersion(agentVer).atLeast(guestGetDevicesMinAgent) {
+		set[catGuestGetDevices] = true
+	}
 
 	return buildRequest(set)
+}
+
+type agentVersion struct {
+	major, minor int
+	known        bool
+}
+
+var agentVersionPattern = regexp.MustCompile(`^(\d+)\.(\d+)`)
+
+// parseAgentVersion reads the leading major.minor out of a guest agent version
+// string, which carries distro suffixes such as "7.2.0-1.el9".
+func parseAgentVersion(s string) agentVersion {
+	match := agentVersionPattern.FindStringSubmatch(strings.TrimSpace(s))
+	if match == nil {
+		return agentVersion{}
+	}
+
+	major, err := strconv.Atoi(match[1])
+	if err != nil {
+		return agentVersion{}
+	}
+	minor, err := strconv.Atoi(match[2])
+	if err != nil {
+		return agentVersion{}
+	}
+
+	return agentVersion{major: major, minor: minor, known: true}
+}
+
+func (v agentVersion) atLeast(min agentVersion) bool {
+	if !v.known {
+		return false
+	}
+	if v.major != min.major {
+		return v.major > min.major
+	}
+	return v.minor >= min.minor
 }
 
 func osFamily(id string) string {
@@ -118,6 +168,8 @@ func buildRequest(set map[category]bool) *VMStatsRequest {
 			req.GuestGetFsInfo = enabled
 		case catGuestNetworkGetInterfaces:
 			req.GuestNetworkGetInterfaces = enabled
+		case catGuestGetDevices:
+			req.GuestGetDevices = enabled
 		}
 	}
 	return req

@@ -46,6 +46,16 @@ func (c *StatsCache) Store(key string, vmi *k6tv1.VirtualMachineInstance, stats 
 	c.items[key] = &CachedStats{VMI: vmi, Stats: stats}
 }
 
+func (c *StatsCache) AgentVersion(key string) string {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+	item := c.items[key]
+	if item == nil || item.Stats == nil {
+		return ""
+	}
+	return item.Stats.GuestAgentVersion
+}
+
 func (c *StatsCache) List() []*CachedStats {
 	c.mu.RLock()
 	defer c.mu.RUnlock()

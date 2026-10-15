@@ -89,12 +89,15 @@ var _ = Describe("VMStats OS-based request policy", func() {
 		}, 2*time.Minute, 10*time.Second).ShouldNot(BeEmpty())
 	})
 
-	It("does not request the windows-family user count for a linux guest", func() {
+	It("does not request the windows-family categories for a linux guest", func() {
 		Consistently(func(g Gomega) []metrics.MetricLine {
 			out, err := metrics.Scrape(kvNamespace, metricsServiceName)
 			g.Expect(err).ToNot(HaveOccurred())
 			metricsOutput = out
-			return scopedLines("kubevirt_vmi_guest_user_count")
+			return append(
+				scopedLines("kubevirt_vmi_guest_user_count"),
+				scopedLines("kubevirt_vmi_guest_device_driver_timestamp_seconds")...,
+			)
 		}, 30*time.Second, 10*time.Second).Should(BeEmpty())
 	})
 })
