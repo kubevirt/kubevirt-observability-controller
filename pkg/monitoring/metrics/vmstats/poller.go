@@ -116,7 +116,7 @@ func (p *Poller) pollOnce() {
 
 			requests := make(map[string]*VMStatsRequest, len(vmiLookup))
 			for key, vmi := range vmiLookup {
-				requests[key] = resolveVMStatsRequest(vmi)
+				requests[key] = resolveVMStatsRequest(vmi, p.cache.AgentVersion(key))
 			}
 
 			results, err := p.client.FetchNodeVMStats(ctx, podIP, requests)
@@ -132,6 +132,9 @@ func (p *Poller) pollOnce() {
 				}
 				if result.Stats == nil {
 					continue
+				}
+				for cmd, cmdErr := range result.Stats.Errors {
+					pollerLog.V(4).Info("vmstats sub-command failed", "vmi", key, "command", cmd, "error", cmdErr)
 				}
 				vmi, ok := vmiLookup[key]
 				if !ok {

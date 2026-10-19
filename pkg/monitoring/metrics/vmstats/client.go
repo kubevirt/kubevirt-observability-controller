@@ -64,6 +64,7 @@ type VMStatsRequest struct {
 	GuestNetworkGetRoute      *statsCategory `json:"guestNetworkGetRoute,omitempty"`
 	GuestNetworkGetInterfaces *statsCategory `json:"guestNetworkGetInterfaces,omitempty"`
 	GuestGetMemoryBlocks      *statsCategory `json:"guestGetMemoryBlocks,omitempty"`
+	GuestGetDevices           *statsCategory `json:"guestGetDevices,omitempty"`
 }
 
 type vmStatsRequestBody struct {

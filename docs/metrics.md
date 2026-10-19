@@ -21,6 +21,7 @@
 | kubevirt_vmi_dirty_rate_bytes_per_second | Metric | Gauge | Guest dirty-rate in bytes per second. |
 | kubevirt_vmi_filesystem_capacity_bytes | Metric | Gauge | Total VM filesystem capacity in bytes. |
 | kubevirt_vmi_filesystem_used_bytes | Metric | Gauge | Used VM filesystem capacity in bytes. |
+| kubevirt_vmi_guest_device_driver_timestamp_seconds | Metric | Gauge | Release date of the driver of a guest device, in seconds since the epoch, as reported by the guest agent. Windows guests only. |
 | kubevirt_vmi_guest_hostname | Metric | Gauge | Guest hostname from the guest agent. |
 | kubevirt_vmi_guest_interface_info | Metric | Gauge | Guest network interface information from the guest agent. |
 | kubevirt_vmi_guest_load_15m | Metric | Gauge | Guest system load average over 15 minutes. |
