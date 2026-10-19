@@ -1,0 +1,14 @@
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  labels:
+    app.kubernetes.io/name: virt-observability-controller
+    app.kubernetes.io/managed-by: kustomize
+  name: guest-device-drivers-rolebinding
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: guest-device-drivers-role
+subjects:
+- kind: ServiceAccount
+  name: controller-manager

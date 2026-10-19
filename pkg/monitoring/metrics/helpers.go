@@ -19,7 +19,9 @@ Copyright The KubeVirt Authors.
 package metrics
 
 import (
+	"fmt"
 	"regexp"
+	"strconv"
 	"strings"
 
 	k8sv1 "k8s.io/api/core/v1"
@@ -177,6 +179,26 @@ func isValidLabelStart(c byte) bool {
 
 func NamespacedKey(namespace, name string) string {
 	return namespace + "/" + name
+}
+
+func FormatDeviceID(id uint16) string {
+	return strings.ToUpper(strconv.FormatUint(uint64(id), 16))
+}
+
+func NormalizeDeviceID(deviceID string) (string, error) {
+	trimmed := strings.TrimSpace(deviceID)
+	if hex, found := strings.CutPrefix(trimmed, "0x"); found {
+		trimmed = hex
+	} else if hex, found := strings.CutPrefix(trimmed, "0X"); found {
+		trimmed = hex
+	}
+
+	parsed, err := strconv.ParseUint(trimmed, 16, 16)
+	if err != nil {
+		return "", fmt.Errorf("%q is not a 16-bit hex device ID", deviceID)
+	}
+
+	return FormatDeviceID(uint16(parsed)), nil
 }
 
 func GetBinding(iface k6tv1.Interface) (bindingType, bindingName string) {
