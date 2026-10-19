@@ -35,7 +35,7 @@ func vmiWithOSID(id string) *k6tv1.VirtualMachineInstance {
 
 var _ = Describe("resolveVMStatsRequest", func() {
 	It("requests only libvirt categories when no guest OS info is reported", func() {
-		req := resolveVMStatsRequest(vmiWithOSID(""))
+		req := resolveVMStatsRequest(vmiWithOSID(""), "")
 
 		Expect(req.DomainStats).ToNot(BeNil())
 		Expect(req.DirtyRate).ToNot(BeNil())
@@ -47,10 +47,11 @@ var _ = Describe("resolveVMStatsRequest", func() {
 		Expect(req.GuestGetUsers).To(BeNil())
 		Expect(req.GuestGetFsInfo).To(BeNil())
 		Expect(req.GuestNetworkGetInterfaces).To(BeNil())
+		Expect(req.GuestGetDevices).To(BeNil())
 	})
 
 	It("adds guest-common and Windows categories for mswindows guests", func() {
-		req := resolveVMStatsRequest(vmiWithOSID("mswindows"))
+		req := resolveVMStatsRequest(vmiWithOSID("mswindows"), "5.2.0")
 
 		Expect(req.DomainStats).ToNot(BeNil())
 		Expect(req.DirtyRate).ToNot(BeNil())
@@ -61,13 +62,14 @@ var _ = Describe("resolveVMStatsRequest", func() {
 		Expect(req.GuestGetFsInfo).ToNot(BeNil())
 
 		Expect(req.GuestGetUsers).ToNot(BeNil())
+		Expect(req.GuestGetDevices).ToNot(BeNil())
 
 		// Network interfaces are a Linux-family extra, not requested for Windows.
 		Expect(req.GuestNetworkGetInterfaces).To(BeNil())
 	})
 
 	It("adds guest-common and Linux categories for a known Linux distro", func() {
-		req := resolveVMStatsRequest(vmiWithOSID("rhel"))
+		req := resolveVMStatsRequest(vmiWithOSID("rhel"), "8.2.0")
 
 		Expect(req.DomainStats).ToNot(BeNil())
 		Expect(req.DirtyRate).ToNot(BeNil())
@@ -78,23 +80,49 @@ var _ = Describe("resolveVMStatsRequest", func() {
 
 		Expect(req.GuestNetworkGetInterfaces).ToNot(BeNil())
 
-		// Users is a Windows-family extra, not requested for Linux.
+		// Users and devices are Windows-family extras, not requested for Linux.
 		Expect(req.GuestGetUsers).To(BeNil())
+		Expect(req.GuestGetDevices).To(BeNil())
 	})
 
 	It("treats any non-empty, non-Windows ID as Linux", func() {
-		req := resolveVMStatsRequest(vmiWithOSID("some-new-distro"))
+		req := resolveVMStatsRequest(vmiWithOSID("some-new-distro"), "8.2.0")
 
 		Expect(req.GuestGetOsInfo).ToNot(BeNil())
 		Expect(req.GuestGetFsInfo).ToNot(BeNil())
 		Expect(req.GuestNetworkGetInterfaces).ToNot(BeNil())
 		Expect(req.GuestGetUsers).To(BeNil())
+		Expect(req.GuestGetDevices).To(BeNil())
 	})
 
+	DescribeTable("gates guest-get-devices on the reported guest agent version",
+		func(agentVer string, requested bool) {
+			req := resolveVMStatsRequest(vmiWithOSID("mswindows"), agentVer)
+
+			if requested {
+				Expect(req.GuestGetDevices).ToNot(BeNil())
+			} else {
+				Expect(req.GuestGetDevices).To(BeNil())
+			}
+			// The rest of the Windows family is version independent.
+			Expect(req.GuestGetUsers).ToNot(BeNil())
+		},
+		Entry("no poll has reported a version yet", "", false),
+		Entry("below the minimum", "5.1.0", false),
+		Entry("at the minimum", "5.2.0", true),
+		Entry("above the minimum", "8.2.0", true),
+		Entry("major bump above the minimum", "10.0.0", true),
+		Entry("major below the minimum", "4.9.9", false),
+		Entry("distro suffixed", "7.2.0-1.el9", true),
+		Entry("major.minor only", "6.2", true),
+		Entry("unparseable", "unknown", false),
+	)
+
 	It("classifies the OS ID case-insensitively", func() {
-		req := resolveVMStatsRequest(vmiWithOSID("MSWindows"))
+		req := resolveVMStatsRequest(vmiWithOSID("MSWindows"), "8.2.0")
 
 		Expect(req.GuestGetUsers).ToNot(BeNil())
+		Expect(req.GuestGetDevices).ToNot(BeNil())
 		Expect(req.GuestNetworkGetInterfaces).To(BeNil())
 	})
 })
@@ -115,5 +143,6 @@ var _ = Describe("buildRequest", func() {
 		Expect(req.GuestGetUsers).ToNot(BeNil())
 		Expect(req.GuestGetFsInfo).ToNot(BeNil())
 		Expect(req.GuestNetworkGetInterfaces).ToNot(BeNil())
+		Expect(req.GuestGetDevices).ToNot(BeNil())
 	})
 })
