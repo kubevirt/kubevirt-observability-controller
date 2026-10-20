@@ -84,7 +84,7 @@ devices:
 
 		Expect(err).ToNot(HaveOccurred())
 		Expect(entries).To(ConsistOf(
-			DriverEntry{DeviceID: "104A", GuestOSVersionID: "2022", DriverVersion: "100.95.104.26200"},
+			DriverEntry{DeviceID: "104a", GuestOSVersionID: "2022", DriverVersion: "100.95.104.26200"},
 		))
 	})
 
@@ -152,6 +152,35 @@ devices:
     current:
       - guestOSVersionID: "2022"
         driverVersion: ""
+`))
+
+		Expect(err).To(MatchError(ContainSubstring("driverVersion")))
+	})
+
+	It("should trim surrounding whitespace off the values it labels series with", func() {
+		entries, err := Parse([]byte(`
+version: v1alpha1
+devices:
+  - deviceID: "1041"
+    current:
+      - guestOSVersionID: " 2022 "
+        driverVersion: " 100.95.104.26200 "
+`))
+
+		Expect(err).ToNot(HaveOccurred())
+		Expect(entries).To(ConsistOf(
+			DriverEntry{DeviceID: "1041", GuestOSVersionID: "2022", DriverVersion: "100.95.104.26200"},
+		))
+	})
+
+	It("should reject a driver version that is only whitespace", func() {
+		_, err := Parse([]byte(`
+version: v1alpha1
+devices:
+  - deviceID: "1041"
+    current:
+      - guestOSVersionID: "2022"
+        driverVersion: "   "
 `))
 
 		Expect(err).To(MatchError(ContainSubstring("driverVersion")))
