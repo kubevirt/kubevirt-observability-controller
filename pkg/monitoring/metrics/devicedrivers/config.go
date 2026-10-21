@@ -20,6 +20,7 @@ package devicedrivers
 
 import (
 	"fmt"
+	"strings"
 
 	"sigs.k8s.io/yaml"
 
@@ -78,22 +79,27 @@ func Parse(data []byte) ([]DriverEntry, error) {
 		}
 
 		for _, version := range device.Current {
-			if version.GuestOSVersionID == "" {
+			// Both are compared against guest agent values as exact label matches,
+			// so stray whitespace here would silently never match.
+			guestOSVersionID := strings.TrimSpace(version.GuestOSVersionID)
+			driverVersion := strings.TrimSpace(version.DriverVersion)
+
+			if guestOSVersionID == "" {
 				return nil, fmt.Errorf("device %q in drivers config has a version without a guestOSVersionID", deviceID)
 			}
 
-			if version.DriverVersion == "" {
+			if driverVersion == "" {
 				return nil, fmt.Errorf(
 					"device %q, guest OS version %q in drivers config has no driverVersion",
-					deviceID, version.GuestOSVersionID,
+					deviceID, guestOSVersionID,
 				)
 			}
 
 			entry := DriverEntry{
 				DeviceID:         deviceID,
 				DeviceName:       device.DeviceName,
-				GuestOSVersionID: version.GuestOSVersionID,
-				DriverVersion:    version.DriverVersion,
+				GuestOSVersionID: guestOSVersionID,
+				DriverVersion:    driverVersion,
 			}
 
 			if seen[entry] {

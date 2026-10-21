@@ -21,9 +21,12 @@ package vmstats
 import (
 	"encoding/json"
 	"fmt"
+	"math"
 
 	"github.com/rhobs/operator-observability-toolkit/pkg/operatormetrics"
 	ctrl "sigs.k8s.io/controller-runtime"
+
+	"github.com/kubevirt/kubevirt-observability-controller/pkg/monitoring/metrics"
 )
 
 var guestLog = ctrl.Log.WithName("vmstats-guest")
@@ -300,5 +303,11 @@ func formatPCIID(id *int64) string {
 	if id == nil || *id < 0 {
 		return ""
 	}
-	return fmt.Sprintf("%04x", *id)
+	if *id > math.MaxUint16 {
+		// Not a PCI device ID. Render it in full rather than truncating, so a
+		// malformed value cannot collide with a real one. NormalizeDeviceID
+		// bounds the drivers config to 16 bits, so it matches no entry there.
+		return fmt.Sprintf("%x", *id)
+	}
+	return metrics.FormatDeviceID(uint16(*id))
 }

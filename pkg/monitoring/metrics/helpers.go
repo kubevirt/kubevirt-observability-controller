@@ -181,8 +181,11 @@ func NamespacedKey(namespace, name string) string {
 	return namespace + "/" + name
 }
 
+// FormatDeviceID renders a PCI device ID as four lower case hex digits without a
+// prefix. Both the device metric and the drivers config loader label device IDs
+// through this helper; any drift between them would silently match nothing.
 func FormatDeviceID(id uint16) string {
-	return strings.ToUpper(strconv.FormatUint(uint64(id), 16))
+	return fmt.Sprintf("%04x", id)
 }
 
 func NormalizeDeviceID(deviceID string) (string, error) {

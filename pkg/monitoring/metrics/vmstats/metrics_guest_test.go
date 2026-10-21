@@ -27,6 +27,8 @@ import (
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	k6tv1 "kubevirt.io/api/core/v1"
+
+	"github.com/kubevirt/kubevirt-observability-controller/pkg/monitoring/metrics"
 )
 
 func device(driverDate int64, name, version string, deviceID int64) string {
@@ -230,6 +232,26 @@ var _ = Describe("Guest Metrics", func() {
 
 		Expect(collectGuestDevices(report)).To(HaveLen(2))
 	})
+
+	DescribeTable("should label a device the way the drivers config normalizes the same id",
+		func(reported int64, written string) {
+			report.Stats.GuestGetDevices = devicesPayload(
+				device(1749427200000000000, "Red Hat VirtIO Ethernet Adapter", "100.101.104.28200", reported),
+			)
+
+			results := collectGuestDevices(report)
+			Expect(results).To(HaveLen(1))
+
+			normalized, err := metrics.NormalizeDeviceID(written)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(results[0].ConstLabels).To(HaveKeyWithValue("device_id", normalized))
+		},
+		Entry("all decimal digits", int64(4161), "1041"),
+		Entry("hex letters, written lower case", int64(4170), "104a"),
+		Entry("hex letters, written upper case", int64(4170), "104A"),
+		Entry("written with a 0x prefix", int64(4170), "0x104a"),
+		Entry("narrower than four digits", int64(65), "41"),
+	)
 
 	It("should keep device ids that collide only when truncated to uint16", func() {
 		report.Stats.GuestGetDevices = devicesPayload(
