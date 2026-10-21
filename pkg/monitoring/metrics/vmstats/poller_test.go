@@ -270,6 +270,217 @@ var _ = Describe("Poller", func() {
 			Entry("agent above 5.2", "8.2.0", true),
 		)
 
+		It("should omit VMIs the request policy has nothing to ask for", func() {
+			var captured vmStatsRequestBody
+
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				Expect(json.NewDecoder(r.Body).Decode(&captured)).To(Succeed())
+				w.Header().Set("Content-Type", "application/json")
+				Expect(json.NewEncoder(w).Encode(map[string]*VMStatsResult{})).To(Succeed())
+			}))
+			defer server.Close()
+
+			win := &k6tv1.VirtualMachineInstance{
+				ObjectMeta: metav1.ObjectMeta{Name: "win", Namespace: "ns1"},
+				Status: k6tv1.VirtualMachineInstanceStatus{
+					NodeName:    "node1",
+					GuestOSInfo: k6tv1.VirtualMachineInstanceGuestOSInfo{ID: "mswindows"},
+				},
+			}
+			vmiStore := cache.NewStore(cache.MetaNamespaceKeyFunc)
+			Expect(vmiStore.Add(win)).To(Succeed())
+			Expect(vmiStore.Add(&k6tv1.VirtualMachineInstance{
+				ObjectMeta: metav1.ObjectMeta{Name: "lin", Namespace: "ns1"},
+				Status: k6tv1.VirtualMachineInstanceStatus{
+					NodeName:    "node1",
+					GuestOSInfo: k6tv1.VirtualMachineInstanceGuestOSInfo{ID: "rhel"},
+				},
+			})).To(Succeed())
+
+			podStore := cache.NewStore(cache.MetaNamespaceKeyFunc)
+			Expect(podStore.Add(&k8sv1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "virt-handler-abc", Namespace: "kubevirt",
+					Labels: map[string]string{"kubevirt.io": "virt-handler"},
+				},
+				Spec:   k8sv1.PodSpec{NodeName: "node1"},
+				Status: k8sv1.PodStatus{PodIP: "10.0.0.5", Phase: k8sv1.PodRunning},
+			})).To(Succeed())
+
+			statsCache := NewStatsCache()
+			statsCache.Store("ns1/win", win, &VMStats{GuestAgentVersion: "8.2.0"})
+
+			vmClient := NewVMStatsClient(server.Client(), 0)
+			vmClient.baseURLOverride = server.URL
+
+			p := NewPoller(PollerConfig{
+				MaxConcurrent: 10,
+				Policy: NewRequestPolicy(map[string]bool{
+					"kubevirt_vmi_guest_device_driver_timestamp_seconds": true,
+				}),
+			}, statsCache, vmClient, vmiStore, podStore)
+			p.pollOnce()
+
+			Expect(captured.VMIs).To(HaveLen(1))
+			Expect(captured.VMIs).To(HaveKey("ns1/win"))
+			Expect(captured.VMIs["ns1/win"].GuestGetDevices).ToNot(BeNil())
+			Expect(captured.VMIs["ns1/win"].DomainStats).To(BeNil())
+		})
+
+		It("should not call a node when no VMI on it needs any category", func() {
+			called := false
+
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				called = true
+				w.Header().Set("Content-Type", "application/json")
+				Expect(json.NewEncoder(w).Encode(map[string]*VMStatsResult{})).To(Succeed())
+			}))
+			defer server.Close()
+
+			vmiStore := cache.NewStore(cache.MetaNamespaceKeyFunc)
+			Expect(vmiStore.Add(&k6tv1.VirtualMachineInstance{
+				ObjectMeta: metav1.ObjectMeta{Name: "lin", Namespace: "ns1"},
+				Status: k6tv1.VirtualMachineInstanceStatus{
+					NodeName:    "node1",
+					GuestOSInfo: k6tv1.VirtualMachineInstanceGuestOSInfo{ID: "rhel"},
+				},
+			})).To(Succeed())
+
+			podStore := cache.NewStore(cache.MetaNamespaceKeyFunc)
+			Expect(podStore.Add(&k8sv1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "virt-handler-abc", Namespace: "kubevirt",
+					Labels: map[string]string{"kubevirt.io": "virt-handler"},
+				},
+				Spec:   k8sv1.PodSpec{NodeName: "node1"},
+				Status: k8sv1.PodStatus{PodIP: "10.0.0.5", Phase: k8sv1.PodRunning},
+			})).To(Succeed())
+
+			vmClient := NewVMStatsClient(server.Client(), 0)
+			vmClient.baseURLOverride = server.URL
+
+			p := NewPoller(PollerConfig{
+				MaxConcurrent: 10,
+				Policy: NewRequestPolicy(map[string]bool{
+					"kubevirt_vmi_guest_device_driver_timestamp_seconds": true,
+				}),
+			}, NewStatsCache(), vmClient, vmiStore, podStore)
+			p.pollOnce()
+
+			Expect(called).To(BeFalse())
+		})
+
+		DescribeTable("should keep bootstrapping guest-get-osinfo until a version is reported",
+			func(firstResult *VMStatsResult) {
+				var bodies []vmStatsRequestBody
+
+				server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+					var body vmStatsRequestBody
+					Expect(json.NewDecoder(r.Body).Decode(&body)).To(Succeed())
+					bodies = append(bodies, body)
+					w.Header().Set("Content-Type", "application/json")
+					Expect(json.NewEncoder(w).Encode(map[string]*VMStatsResult{
+						"ns1/win": firstResult,
+					})).To(Succeed())
+				}))
+				defer server.Close()
+
+				vmiStore := cache.NewStore(cache.MetaNamespaceKeyFunc)
+				Expect(vmiStore.Add(&k6tv1.VirtualMachineInstance{
+					ObjectMeta: metav1.ObjectMeta{Name: "win", Namespace: "ns1"},
+					Status: k6tv1.VirtualMachineInstanceStatus{
+						NodeName:    "node1",
+						GuestOSInfo: k6tv1.VirtualMachineInstanceGuestOSInfo{ID: "mswindows"},
+					},
+				})).To(Succeed())
+
+				podStore := cache.NewStore(cache.MetaNamespaceKeyFunc)
+				Expect(podStore.Add(&k8sv1.Pod{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "virt-handler-abc", Namespace: "kubevirt",
+						Labels: map[string]string{"kubevirt.io": "virt-handler"},
+					},
+					Spec:   k8sv1.PodSpec{NodeName: "node1"},
+					Status: k8sv1.PodStatus{PodIP: "10.0.0.5", Phase: k8sv1.PodRunning},
+				})).To(Succeed())
+
+				vmClient := NewVMStatsClient(server.Client(), 0)
+				vmClient.baseURLOverride = server.URL
+
+				p := NewPoller(PollerConfig{
+					MaxConcurrent: 10,
+					Policy: NewRequestPolicy(map[string]bool{
+						"kubevirt_vmi_guest_device_driver_timestamp_seconds": true,
+					}),
+				}, NewStatsCache(), vmClient, vmiStore, podStore)
+
+				p.pollOnce()
+				p.pollOnce()
+
+				Expect(bodies).To(HaveLen(2))
+				for i, body := range bodies {
+					Expect(body.VMIs["ns1/win"].GuestGetOsInfo).ToNot(BeNil(),
+						"poll %d should still be bootstrapping", i+1)
+					Expect(body.VMIs["ns1/win"].GuestGetDevices).To(BeNil())
+				}
+			},
+			Entry("the VMI errored", &VMStatsResult{Error: "boom"}),
+			Entry("no stats came back", &VMStatsResult{}),
+			Entry("the guest agent reported no version", &VMStatsResult{Stats: &VMStats{}}),
+		)
+
+		It("should stop bootstrapping once a version is reported", func() {
+			var bodies []vmStatsRequestBody
+
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				var body vmStatsRequestBody
+				Expect(json.NewDecoder(r.Body).Decode(&body)).To(Succeed())
+				bodies = append(bodies, body)
+				w.Header().Set("Content-Type", "application/json")
+				Expect(json.NewEncoder(w).Encode(map[string]*VMStatsResult{
+					"ns1/win": {Stats: &VMStats{GuestAgentVersion: "8.2.0"}},
+				})).To(Succeed())
+			}))
+			defer server.Close()
+
+			vmiStore := cache.NewStore(cache.MetaNamespaceKeyFunc)
+			Expect(vmiStore.Add(&k6tv1.VirtualMachineInstance{
+				ObjectMeta: metav1.ObjectMeta{Name: "win", Namespace: "ns1"},
+				Status: k6tv1.VirtualMachineInstanceStatus{
+					NodeName:    "node1",
+					GuestOSInfo: k6tv1.VirtualMachineInstanceGuestOSInfo{ID: "mswindows"},
+				},
+			})).To(Succeed())
+
+			podStore := cache.NewStore(cache.MetaNamespaceKeyFunc)
+			Expect(podStore.Add(&k8sv1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "virt-handler-abc", Namespace: "kubevirt",
+					Labels: map[string]string{"kubevirt.io": "virt-handler"},
+				},
+				Spec:   k8sv1.PodSpec{NodeName: "node1"},
+				Status: k8sv1.PodStatus{PodIP: "10.0.0.5", Phase: k8sv1.PodRunning},
+			})).To(Succeed())
+
+			vmClient := NewVMStatsClient(server.Client(), 0)
+			vmClient.baseURLOverride = server.URL
+
+			p := NewPoller(PollerConfig{
+				MaxConcurrent: 10,
+				Policy: NewRequestPolicy(map[string]bool{
+					"kubevirt_vmi_guest_device_driver_timestamp_seconds": true,
+				}),
+			}, NewStatsCache(), vmClient, vmiStore, podStore)
+
+			p.pollOnce()
+			p.pollOnce()
+
+			Expect(bodies).To(HaveLen(2))
+			Expect(bodies[0].VMIs["ns1/win"].GuestGetOsInfo).ToNot(BeNil())
+			Expect(bodies[1].VMIs["ns1/win"].GuestGetDevices).ToNot(BeNil())
+			Expect(bodies[1].VMIs["ns1/win"].GuestGetOsInfo).To(BeNil())
+		})
+
 		It("should skip VMIs with errors in bulk response", func() {
 			bulkResponse := map[string]*VMStatsResult{
 				"ns1/vm1": {

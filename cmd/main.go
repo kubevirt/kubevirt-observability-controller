@@ -454,6 +454,12 @@ func setupVMStats(
 		os.Exit(1)
 	}
 
+	policy := vmstats.NewRequestPolicy(allowlist)
+	if !policy.Enabled() {
+		setupLog.Info("metrics allowlist keeps no vmstats metric, skipping vmstats polling")
+		return
+	}
+
 	httpClient := &http.Client{
 		Timeout: 30 * time.Second,
 		Transport: &http.Transport{
@@ -497,6 +503,7 @@ func setupVMStats(
 				PollInterval:  30 * time.Second,
 				MaxConcurrent: 10,
 				Port:          vmstatsPort,
+				Policy:        policy,
 			},
 			statsCache,
 			vmStatsClient,
