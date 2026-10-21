@@ -36,6 +36,7 @@ type PollerConfig struct {
 	PollInterval  time.Duration
 	MaxConcurrent int
 	Port          int
+	Policy        *RequestPolicy
 }
 
 type Poller struct {
@@ -50,6 +51,10 @@ func NewPoller(
 	config PollerConfig, statsCache *StatsCache, client *VMStatsClient,
 	vmiStore cache.Store, podStore cache.Store,
 ) *Poller {
+	if config.Policy == nil {
+		config.Policy = NewRequestPolicy(nil)
+	}
+
 	return &Poller{
 		config:   config,
 		cache:    statsCache,
@@ -99,6 +104,16 @@ func (p *Poller) pollOnce() {
 			activeKeysMu.Unlock()
 		}
 
+		requests := make(map[string]*VMStatsRequest, len(vmiLookup))
+		for key, vmi := range vmiLookup {
+			if req := p.config.Policy.Resolve(vmi, p.cache.AgentVersion(key)); req != nil {
+				requests[key] = req
+			}
+		}
+		if len(requests) == 0 {
+			continue
+		}
+
 		podIP, err := findVirtHandlerPodIP(p.podStore, node)
 		if err != nil {
 			pollerLog.V(4).Info("skipping node: no virt-handler pod", "node", node, "error", err)
@@ -107,17 +122,16 @@ func (p *Poller) pollOnce() {
 
 		wg.Add(1)
 		sem <- struct{}{}
-		go func(node, podIP string, vmiLookup map[string]*k6tv1.VirtualMachineInstance) {
+		go func(
+			node, podIP string,
+			requests map[string]*VMStatsRequest,
+			vmiLookup map[string]*k6tv1.VirtualMachineInstance,
+		) {
 			defer wg.Done()
 			defer func() { <-sem }()
 
 			ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 			defer cancel()
-
-			requests := make(map[string]*VMStatsRequest, len(vmiLookup))
-			for key, vmi := range vmiLookup {
-				requests[key] = resolveVMStatsRequest(vmi, p.cache.AgentVersion(key))
-			}
 
 			results, err := p.client.FetchNodeVMStats(ctx, podIP, requests)
 			if err != nil {
@@ -142,7 +156,7 @@ func (p *Poller) pollOnce() {
 				}
 				p.cache.Store(key, vmi, result.Stats)
 			}
-		}(node, podIP, vmiLookup)
+		}(node, podIP, requests, vmiLookup)
 	}
 
 	wg.Wait()

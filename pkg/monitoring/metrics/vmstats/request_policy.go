@@ -20,9 +20,11 @@ package vmstats
 
 import (
 	"regexp"
+	"slices"
 	"strconv"
 	"strings"
 
+	"github.com/rhobs/operator-observability-toolkit/pkg/operatormetrics"
 	k6tv1 "kubevirt.io/api/core/v1"
 )
 
@@ -73,13 +75,56 @@ var osFamilyCategories = map[string][]category{
 
 var guestGetDevicesMinAgent = agentVersion{major: 5, minor: 2, known: true}
 
-// resolveVMStatsRequest decides which stats categories to request for a single
-// VMI. libvirt categories are always requested, guest-agent categories are
-// added only when the guest agent has reported an OS, OS-family specific are
-// added based on that returned value.
-func resolveVMStatsRequest(vmi *k6tv1.VirtualMachineInstance, agentVer string) *VMStatsRequest {
+var categoryMetrics = map[category][]operatormetrics.Metric{
+	catDomainStats: slices.Concat(
+		cpuMetricsList, memoryMetricsList, vcpuMetricsList,
+		networkMetricsList, blockMetricsList, dirtyRateMetricsList,
+	),
+	catDirtyRate:                 dirtyRateMetricsList,
+	catGuestGetOsInfo:            {guestOsInfo},
+	catGuestGetHostName:          {guestHostname},
+	catGuestGetTimezone:          {guestTimezone},
+	catGuestGetUsers:             {guestUserCount},
+	catGuestGetFsInfo:            {filesystemCapacityBytes, filesystemUsedBytes},
+	catGuestNetworkGetInterfaces: {guestInterfaceInfo},
+	catGuestGetDevices:           {guestDeviceDriverTimestamp},
+}
+
+type RequestPolicy struct {
+	allowed map[category]bool
+}
+
+func NewRequestPolicy(allowlist map[string]bool) *RequestPolicy {
+	if allowlist == nil {
+		return &RequestPolicy{}
+	}
+
+	allowed := make(map[category]bool)
+	for cat, metrics := range categoryMetrics {
+		for _, m := range metrics {
+			if allowlist[m.GetOpts().Name] {
+				allowed[cat] = true
+				break
+			}
+		}
+	}
+	return &RequestPolicy{allowed: allowed}
+}
+
+func (p *RequestPolicy) allows(c category) bool {
+	if p.allowed == nil {
+		return true
+	}
+	return p.allowed[c]
+}
+
+func (p *RequestPolicy) Enabled() bool {
+	return p.allowed == nil || len(p.allowed) > 0
+}
+
+func (p *RequestPolicy) Resolve(vmi *k6tv1.VirtualMachineInstance, agentVer string) *VMStatsRequest {
 	set := make(map[category]bool)
-	addCategories(set, libvirtCategories)
+	p.addCategories(set, libvirtCategories)
 
 	id := strings.ToLower(strings.TrimSpace(vmi.Status.GuestOSInfo.ID))
 	if id == "" {
@@ -88,11 +133,16 @@ func resolveVMStatsRequest(vmi *k6tv1.VirtualMachineInstance, agentVer string) *
 	}
 
 	family := osFamily(id)
-	addCategories(set, guestCommonCategories)
-	addCategories(set, osFamilyCategories[family])
+	p.addCategories(set, guestCommonCategories)
+	p.addCategories(set, osFamilyCategories[family])
 
-	if family == windowsFamily && parseAgentVersion(agentVer).atLeast(guestGetDevicesMinAgent) {
-		set[catGuestGetDevices] = true
+	if family == windowsFamily && p.allows(catGuestGetDevices) {
+		switch version := parseAgentVersion(agentVer); {
+		case version.atLeast(guestGetDevicesMinAgent):
+			set[catGuestGetDevices] = true
+		case agentVer == "":
+			set[catGuestGetOsInfo] = true
+		}
 	}
 
 	return buildRequest(set)
@@ -142,13 +192,19 @@ func osFamily(id string) string {
 	return "linux"
 }
 
-func addCategories(set map[category]bool, cats []category) {
+func (p *RequestPolicy) addCategories(set map[category]bool, cats []category) {
 	for _, c := range cats {
-		set[c] = true
+		if p.allows(c) {
+			set[c] = true
+		}
 	}
 }
 
 func buildRequest(set map[category]bool) *VMStatsRequest {
+	if len(set) == 0 {
+		return nil
+	}
+
 	req := &VMStatsRequest{}
 	for c := range set {
 		switch c {
