@@ -25,11 +25,11 @@
 | kubevirt_vmi_filesystem_used_bytes | Metric | Gauge | Used VM filesystem capacity in bytes. |
 | kubevirt_vmi_guest_device_driver_timestamp_seconds | Metric | Gauge | Release date of the driver of a guest device, in seconds since the epoch, as reported by the guest agent. Windows guests only. |
 | kubevirt_vmi_guest_hostname | Metric | Gauge | Guest hostname from the guest agent. |
-| kubevirt_vmi_guest_interface_info | Metric | Gauge | Guest network interface information from the guest agent. |
+| kubevirt_vmi_guest_interface_info | Metric | Gauge | Guest network interface information reported in the VMI status. |
 | kubevirt_vmi_guest_load_15m | Metric | Gauge | Guest system load average over 15 minutes. |
 | kubevirt_vmi_guest_load_1m | Metric | Gauge | Guest system load average over 1 minute. |
 | kubevirt_vmi_guest_load_5m | Metric | Gauge | Guest system load average over 5 minutes. |
-| kubevirt_vmi_guest_os_info | Metric | Gauge | Guest OS information from the guest agent. |
+| kubevirt_vmi_guest_os_info | Metric | Gauge | Guest OS information reported in the VMI status. |
 | kubevirt_vmi_guest_timezone | Metric | Gauge | Guest timezone from the guest agent. |
 | kubevirt_vmi_guest_user_count | Metric | Gauge | Number of logged-in users in the guest. |
 | kubevirt_vmi_info | Metric | Gauge | Information about VirtualMachineInstances. |

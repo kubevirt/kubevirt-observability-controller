@@ -161,6 +161,89 @@ var _ = Describe("VMI Stats Collector", func() {
 		})
 	})
 
+	Describe("collectVMIGuestOSInfo", func() {
+		It("should collect the guest OS reported in the VMI status", func() {
+			vmi := &k6tv1.VirtualMachineInstance{
+				ObjectMeta: metav1.ObjectMeta{Name: "vmi1", Namespace: "ns1"},
+				Status: k6tv1.VirtualMachineInstanceStatus{
+					NodeName: "node1",
+					GuestOSInfo: k6tv1.VirtualMachineInstanceGuestOSInfo{
+						ID:            "fedora",
+						Name:          "Fedora Linux",
+						Version:       "38",
+						KernelRelease: "6.2.0",
+						Machine:       "x86_64",
+					},
+				},
+			}
+
+			results := collectVMIGuestOSInfo(vmi)
+
+			Expect(results).To(HaveLen(1))
+			Expect(results[0].Value).To(Equal(1.0))
+			Expect(results[0].Labels).To(Equal([]string{
+				"node1", "ns1", "vmi1",
+				"Fedora Linux", "38", "fedora", "6.2.0", "x86_64",
+			}))
+		})
+
+		It("should report nothing when the VMI status has no guest OS", func() {
+			vmi := &k6tv1.VirtualMachineInstance{
+				ObjectMeta: metav1.ObjectMeta{Name: "vmi1", Namespace: "ns1"},
+				Status: k6tv1.VirtualMachineInstanceStatus{
+					GuestOSInfo: k6tv1.VirtualMachineInstanceGuestOSInfo{VersionID: "2022"},
+				},
+			}
+
+			Expect(collectVMIGuestOSInfo(vmi)).To(BeEmpty())
+		})
+	})
+
+	Describe("collectVMIGuestInterfaces", func() {
+		It("should collect one series per status interface", func() {
+			vmi := &k6tv1.VirtualMachineInstance{
+				ObjectMeta: metav1.ObjectMeta{Name: "vmi1", Namespace: "ns1"},
+				Status: k6tv1.VirtualMachineInstanceStatus{
+					NodeName: "node1",
+					Interfaces: []k6tv1.VirtualMachineInstanceNetworkInterface{
+						{
+							Name:          "default",
+							InterfaceName: "eth0",
+							MAC:           "f6:98:90:b9:bd:70",
+							IP:            "10.0.2.2",
+							IPs:           []string{"10.0.2.2", "fd10::2"},
+						},
+						{
+							Name: "secondary",
+							MAC:  "02:11:22:33:44:55",
+						},
+					},
+				},
+			}
+
+			results := collectVMIGuestInterfaces(vmi)
+
+			Expect(results).To(HaveLen(2))
+			Expect(results[0].Value).To(Equal(1.0))
+			Expect(results[0].Labels).To(Equal([]string{
+				"node1", "ns1", "vmi1",
+				"eth0", "default", "f6:98:90:b9:bd:70", "10.0.2.2",
+			}))
+			Expect(results[1].Labels).To(Equal([]string{
+				"node1", "ns1", "vmi1",
+				"", "secondary", "02:11:22:33:44:55", "",
+			}))
+		})
+
+		It("should report nothing when the VMI status has no interfaces", func() {
+			vmi := &k6tv1.VirtualMachineInstance{
+				ObjectMeta: metav1.ObjectMeta{Name: "vmi1", Namespace: "ns1"},
+			}
+
+			Expect(collectVMIGuestInterfaces(vmi)).To(BeEmpty())
+		})
+	})
+
 	Describe("CollectVMIMigrationTime", func() {
 		It("should return empty when no migration state", func() {
 			vmi := &k6tv1.VirtualMachineInstance{

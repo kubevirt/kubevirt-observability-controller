@@ -33,15 +33,11 @@ var guestLog = ctrl.Log.WithName("vmstats-guest")
 
 var (
 	guestMetricsList = []operatormetrics.Metric{
-		guestOsInfo, guestHostname, guestTimezone,
+		guestHostname, guestTimezone,
 		guestUserCount, filesystemCapacityBytes, filesystemUsedBytes,
-		guestInterfaceInfo, guestDeviceDriverTimestamp,
+		guestDeviceDriverTimestamp,
 	}
 
-	guestOsInfo = operatormetrics.NewGauge(operatormetrics.MetricOpts{
-		Name: "kubevirt_vmi_guest_os_info",
-		Help: "Guest OS information from the guest agent.",
-	})
 	guestHostname = operatormetrics.NewGauge(operatormetrics.MetricOpts{
 		Name: "kubevirt_vmi_guest_hostname",
 		Help: "Guest hostname from the guest agent.",
@@ -62,10 +58,6 @@ var (
 		Name: "kubevirt_vmi_filesystem_used_bytes",
 		Help: "Used VM filesystem capacity in bytes.",
 	})
-	guestInterfaceInfo = operatormetrics.NewGauge(operatormetrics.MetricOpts{
-		Name: "kubevirt_vmi_guest_interface_info",
-		Help: "Guest network interface information from the guest agent.",
-	})
 	guestDeviceDriverTimestamp = operatormetrics.NewGauge(operatormetrics.MetricOpts{
 		Name: "kubevirt_vmi_guest_device_driver_timestamp_seconds",
 		Help: "Release date of the driver of a guest device, in seconds since the epoch, " +
@@ -75,12 +67,10 @@ var (
 
 func collectGuestMetrics(report *VMIReport) []operatormetrics.CollectorResult {
 	var crs []operatormetrics.CollectorResult //nolint:prealloc
-	crs = append(crs, collectGuestOsInfo(report)...)
 	crs = append(crs, collectGuestHostname(report)...)
 	crs = append(crs, collectGuestTimezone(report)...)
 	crs = append(crs, collectGuestUsers(report)...)
 	crs = append(crs, collectGuestFilesystems(report)...)
-	crs = append(crs, collectGuestInterfaces(report)...)
 	crs = append(crs, collectGuestDevices(report)...)
 	return crs
 }
@@ -96,32 +86,6 @@ func guestReturn(payload string) json.RawMessage {
 		return nil
 	}
 	return env.Return
-}
-
-func collectGuestOsInfo(report *VMIReport) []operatormetrics.CollectorResult {
-	raw := guestReturn(report.Stats.GuestGetOsInfo)
-	if raw == nil {
-		return nil
-	}
-	var info struct {
-		ID            string `json:"id"`
-		Name          string `json:"name"`
-		Version       string `json:"version"`
-		KernelRelease string `json:"kernel-release"`
-		Machine       string `json:"machine"`
-	}
-	if err := json.Unmarshal(raw, &info); err != nil {
-		return nil
-	}
-	return []operatormetrics.CollectorResult{
-		report.newCollectorResultWithLabels(guestOsInfo, 1.0, map[string]string{
-			"os_name":        info.Name,
-			"os_version":     info.Version,
-			"os_id":          info.ID,
-			"kernel_release": info.KernelRelease,
-			"machine":        info.Machine,
-		}),
-	}
 }
 
 func collectGuestHostname(report *VMIReport) []operatormetrics.CollectorResult {
@@ -202,36 +166,6 @@ func collectGuestFilesystems(report *VMIReport) []operatormetrics.CollectorResul
 			report.newCollectorResultWithLabels(filesystemCapacityBytes, float64(fs.Total), labels),
 			report.newCollectorResultWithLabels(filesystemUsedBytes, float64(fs.Used), labels),
 		)
-	}
-	return crs
-}
-
-func collectGuestInterfaces(report *VMIReport) []operatormetrics.CollectorResult {
-	raw := guestReturn(report.Stats.GuestNetworkGetInterfaces)
-	if raw == nil {
-		return nil
-	}
-	var ifaces []struct {
-		Name        string `json:"name"`
-		MAC         string `json:"hardware-address"`
-		IPAddresses []struct {
-			Address string `json:"ip-address"`
-		} `json:"ip-addresses"`
-	}
-	if err := json.Unmarshal(raw, &ifaces); err != nil {
-		return nil
-	}
-	var crs []operatormetrics.CollectorResult
-	for _, iface := range ifaces {
-		ipAddr := ""
-		if len(iface.IPAddresses) > 0 {
-			ipAddr = iface.IPAddresses[0].Address
-		}
-		crs = append(crs, report.newCollectorResultWithLabels(guestInterfaceInfo, 1.0, map[string]string{
-			"interface_name": iface.Name,
-			"mac":            iface.MAC,
-			"ip_address":     ipAddr,
-		}))
 	}
 	return crs
 }

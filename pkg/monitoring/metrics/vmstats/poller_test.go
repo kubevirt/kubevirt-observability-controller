@@ -211,9 +211,8 @@ var _ = Describe("Poller", func() {
 			Expect(captured.VMIs).To(HaveKey("ns1/win"))
 			Expect(captured.VMIs).To(HaveKey("ns1/lin"))
 			Expect(captured.VMIs["ns1/win"].GuestGetUsers).ToNot(BeNil())
-			Expect(captured.VMIs["ns1/win"].GuestNetworkGetInterfaces).To(BeNil())
-			Expect(captured.VMIs["ns1/lin"].GuestNetworkGetInterfaces).ToNot(BeNil())
 			Expect(captured.VMIs["ns1/lin"].GuestGetUsers).To(BeNil())
+			Expect(captured.VMIs["ns1/lin"].GuestGetHostName).ToNot(BeNil())
 
 			// No poll has reported a guest agent version yet.
 			Expect(captured.VMIs["ns1/win"].GuestGetDevices).To(BeNil())
@@ -370,7 +369,7 @@ var _ = Describe("Poller", func() {
 			Expect(called).To(BeFalse())
 		})
 
-		DescribeTable("should keep bootstrapping guest-get-osinfo until a version is reported",
+		DescribeTable("should keep bootstrapping guest-get-hostname until a version is reported",
 			func(firstResult *VMStatsResult) {
 				var bodies []vmStatsRequestBody
 
@@ -419,7 +418,7 @@ var _ = Describe("Poller", func() {
 
 				Expect(bodies).To(HaveLen(2))
 				for i, body := range bodies {
-					Expect(body.VMIs["ns1/win"].GuestGetOsInfo).ToNot(BeNil(),
+					Expect(body.VMIs["ns1/win"].GuestGetHostName).ToNot(BeNil(),
 						"poll %d should still be bootstrapping", i+1)
 					Expect(body.VMIs["ns1/win"].GuestGetDevices).To(BeNil())
 				}
@@ -476,9 +475,9 @@ var _ = Describe("Poller", func() {
 			p.pollOnce()
 
 			Expect(bodies).To(HaveLen(2))
-			Expect(bodies[0].VMIs["ns1/win"].GuestGetOsInfo).ToNot(BeNil())
+			Expect(bodies[0].VMIs["ns1/win"].GuestGetHostName).ToNot(BeNil())
 			Expect(bodies[1].VMIs["ns1/win"].GuestGetDevices).ToNot(BeNil())
-			Expect(bodies[1].VMIs["ns1/win"].GuestGetOsInfo).To(BeNil())
+			Expect(bodies[1].VMIs["ns1/win"].GuestGetHostName).To(BeNil())
 		})
 
 		It("should skip VMIs with errors in bulk response", func() {

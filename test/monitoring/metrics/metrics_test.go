@@ -61,4 +61,30 @@ var _ = Describe("Custom Metrics", func() {
 		Expect(found).To(BeTrue(),
 			"kubevirt_vmi_info for e2e-test-vmi not found")
 	})
+
+	It("should expose guest OS and interface info from the VMI status", func() {
+		scopedLines := func(metricName string) []metrics.MetricLine {
+			var out []metrics.MetricLine
+			for _, l := range metrics.FindMetric(metricsOutput, metricName) {
+				if metrics.HasLabel(l, "name", "e2e-test-vmi") &&
+					metrics.HasLabel(l, "namespace", testVMINamespace) {
+					out = append(out, l)
+				}
+			}
+			return out
+		}
+
+		Eventually(func(g Gomega) {
+			var err error
+			metricsOutput, err = metrics.Scrape(kvNamespace, metricsServiceName)
+			g.Expect(err).ToNot(HaveOccurred())
+			g.Expect(scopedLines("kubevirt_vmi_guest_os_info")).ToNot(BeEmpty())
+			g.Expect(scopedLines("kubevirt_vmi_guest_interface_info")).ToNot(BeEmpty())
+		}, 5*time.Minute, 10*time.Second).Should(Succeed())
+
+		for _, l := range scopedLines("kubevirt_vmi_guest_interface_info") {
+			Expect(metrics.HasLabel(l, "network_name", "default")).To(BeTrue(),
+				"interface series should carry the network name from status.interfaces")
+		}
+	})
 })
