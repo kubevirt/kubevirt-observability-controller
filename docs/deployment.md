@@ -67,6 +67,7 @@ The controller accepts the following flags (set via the Deployment's `args`):
 | `--enable-vmstats` | `false` | Enable the vmstats poller for domain-level VM metrics |
 | `--vmstats-port` | `8187` | Port for the virt-handler vmstats endpoint |
 | `--vmstats-cert-path` | `""` | Directory containing the vmstats client certificate |
+| `--kubevirt-namespace` | own namespace | Namespace KubeVirt is installed in, where the `kubevirt-ca` CA bundle is read from |
 | `--metrics-cert-path` | `""` | Directory containing the metrics server TLS certificate |
 | `--webhook-cert-path` | `""` | Directory containing the webhook certificate |
 
@@ -82,6 +83,10 @@ kubectl patch kubevirt kubevirt -n kubevirt --type merge -p \
 ```
 
 The controller also needs access to the virt-handler monitoring client certificate. Mount the `kubevirt-virt-handler-monitoring-client-certs` secret and pass its path via `--vmstats-cert-path` (the default kustomize deployment handles this automatically).
+
+The connection is mutually authenticated: virt-handler requires a client certificate with the `monitoring` common name, and the controller verifies the virt-handler server certificate against the KubeVirt CA bundle in the `kubevirt-ca` ConfigMap.
+
+That client certificate secret can only be mounted from the controller's own namespace, so the controller has to run in the KubeVirt namespace for vmstats to work, and the CA bundle is read from there too. `--kubevirt-namespace` overrides it if the secret reaches the pod some other way.
 
 ## 5. Self-managed resources
 

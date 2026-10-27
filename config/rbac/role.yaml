@@ -15,6 +15,11 @@ rules:
 - apiGroups: [""]
   resources: ["pods", "persistentvolumeclaims"]
   verbs: ["get", "list", "watch"]
+# The KubeVirt CA bundle, used to verify the virt-handler vmstats server certificate.
+- apiGroups: [""]
+  resources: ["configmaps"]
+  resourceNames: ["kubevirt-ca"]
+  verbs: ["get"]
 - apiGroups: ["apps"]
   resources: ["controllerrevisions"]
   verbs: ["get", "list", "watch"]
