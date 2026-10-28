@@ -201,6 +201,10 @@ func (r *MetricsResourcesReconciler) buildDesiredServiceMonitor() *monitoringv1.
 	if r.SecureMetrics {
 		scheme := monitoringv1.Scheme("https")
 		endpoint.Scheme = &scheme
+		// The metrics server serves a self-signed certificate unless
+		// --metrics-cert-path is set, and no CA bundle is published for Prometheus
+		// to verify it against. virt-operator and the hyperconverged-cluster-operator
+		// skip verification on their own ServiceMonitors for the same reason.
 		endpoint.TLSConfig = &monitoringv1.TLSConfig{
 			SafeTLSConfig: monitoringv1.SafeTLSConfig{
 				InsecureSkipVerify: ptr.To(true),

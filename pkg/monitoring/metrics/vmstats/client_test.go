@@ -184,11 +184,4 @@ var _ = Describe("VMStatsClient", func() {
 		})
 		Expect(err).To(HaveOccurred())
 	})
-
-	Describe("NewTLSConfigFromCA", func() {
-		It("should return error for invalid CA data", func() {
-			_, err := NewTLSConfigFromCA([]byte("not a cert"))
-			Expect(err).To(HaveOccurred())
-		})
-	})
 })

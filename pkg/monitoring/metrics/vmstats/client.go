@@ -21,8 +21,6 @@ package vmstats
 import (
 	"bytes"
 	"context"
-	"crypto/tls"
-	"crypto/x509"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -109,15 +107,4 @@ func (c *VMStatsClient) FetchNodeVMStats(
 		return nil, fmt.Errorf("decoding response: %w", err)
 	}
 	return results, nil
-}
-
-func NewTLSConfigFromCA(caData []byte) (*tls.Config, error) {
-	pool := x509.NewCertPool()
-	if !pool.AppendCertsFromPEM(caData) {
-		return nil, fmt.Errorf("failed to parse CA certificate")
-	}
-	return &tls.Config{
-		RootCAs:    pool,
-		MinVersion: tls.VersionTLS12,
-	}, nil
 }

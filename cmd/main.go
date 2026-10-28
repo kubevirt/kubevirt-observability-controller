@@ -132,16 +132,20 @@ func main() {
 		"Comma-separated list of recording rule names to include in the PrometheusRule. "+
 			"Empty (default) includes all. \"none\" disables all recording rules.")
 	var enableVMStats bool
-	var vmstatsPort int
-	var vmstatsCertPath, vmstatsCertName, vmstatsCertKey string
+	var vmstatsOpts vmstatsOptions
 	flag.BoolVar(&enableVMStats, "enable-vmstats", false,
 		"Enable VMStats polling from virt-handler endpoints.")
-	flag.IntVar(&vmstatsPort, "vmstats-port", 8187,
+	flag.IntVar(&vmstatsOpts.port, "vmstats-port", 8187,
 		"The port on virt-handler where the /v1/vmstats endpoint is served.")
-	flag.StringVar(&vmstatsCertPath, "vmstats-cert-path", "",
+	flag.StringVar(&vmstatsOpts.certPath, "vmstats-cert-path", "",
 		"The directory that contains the client certificate for authenticating to virt-handler vmstats endpoint.")
-	flag.StringVar(&vmstatsCertName, "vmstats-cert-name", "tls.crt", "The name of the vmstats client certificate file.")
-	flag.StringVar(&vmstatsCertKey, "vmstats-cert-key", "tls.key", "The name of the vmstats client key file.")
+	flag.StringVar(&vmstatsOpts.certName, "vmstats-cert-name", "tls.crt",
+		"The name of the vmstats client certificate file.")
+	flag.StringVar(&vmstatsOpts.certKey, "vmstats-cert-key", "tls.key", "The name of the vmstats client key file.")
+	flag.StringVar(&vmstatsOpts.kubevirtNamespace, "kubevirt-namespace", "",
+		"The namespace KubeVirt is installed in, where the "+vmstats.CAConfigMapName+" ConfigMap is read from to "+
+			"verify the virt-handler server certificate. Defaults to the controller's own namespace, which is "+
+			"where the vmstats client certificate secret has to be mounted from anyway.")
 	opts := zap.Options{
 		Development: true,
 	}
@@ -373,7 +377,10 @@ func main() {
 	}
 
 	if enableVMStats {
-		setupVMStats(mgr, vmstatsPort, vmstatsCertPath, vmstatsCertName, vmstatsCertKey, allowlist)
+		if vmstatsOpts.kubevirtNamespace == "" {
+			vmstatsOpts.kubevirtNamespace = podNamespace
+		}
+		setupVMStats(mgr, vmstatsOpts, allowlist)
 	} else {
 		setupLog.Info("VMStats polling disabled")
 	}
@@ -436,19 +443,31 @@ func logAllowlistStatus(allowlist map[string]bool) {
 	setupLog.Info("metrics allowlist active", "count", len(registered))
 }
 
-func setupVMStats(
-	mgr manager.Manager,
-	vmstatsPort int, vmstatsCertPath, vmstatsCertName, vmstatsCertKey string,
-	allowlist map[string]bool,
-) {
-	if vmstatsCertPath == "" {
+type vmstatsOptions struct {
+	port              int
+	certPath          string
+	certName          string
+	certKey           string
+	kubevirtNamespace string
+}
+
+func setupVMStats(mgr manager.Manager, opts vmstatsOptions, allowlist map[string]bool) {
+	if opts.certPath == "" {
 		setupLog.Error(fmt.Errorf("vmstats-cert-path is required when vmstats is enabled"), "missing required flag")
 		os.Exit(1)
 	}
 
-	certFile := filepath.Join(vmstatsCertPath, vmstatsCertName)
-	keyFile := filepath.Join(vmstatsCertPath, vmstatsCertKey)
-	cert, err := tls.LoadX509KeyPair(certFile, keyFile)
+	if opts.kubevirtNamespace == "" {
+		setupLog.Error(fmt.Errorf("kubevirt-namespace is required when vmstats is enabled"), "missing required flag")
+		os.Exit(1)
+	}
+
+	// A certificate watcher keeps up with the rotations virt-operator performs
+	// on the monitoring client certificate.
+	clientCertWatcher, err := certwatcher.New(
+		filepath.Join(opts.certPath, opts.certName),
+		filepath.Join(opts.certPath, opts.certKey),
+	)
 	if err != nil {
 		setupLog.Error(err, "unable to load vmstats client certificate")
 		os.Exit(1)
@@ -460,18 +479,31 @@ func setupVMStats(
 		return
 	}
 
+	// GetAPIReader bypasses the manager cache, which only watches the guest
+	// device drivers ConfigMap in the controller namespace.
+	caManager := vmstats.NewCAManager(mgr.GetAPIReader(), opts.kubevirtNamespace)
+	if _, err := caManager.CertPool(context.Background()); err != nil {
+		setupLog.Error(err, "unable to read the KubeVirt CA bundle, vmstats polling fails until it is readable",
+			"namespace", opts.kubevirtNamespace, "configmap", vmstats.CAConfigMapName)
+	}
+
+	if err := mgr.Add(clientCertWatcher); err != nil {
+		setupLog.Error(err, "unable to add vmstats client certificate watcher to manager")
+		os.Exit(1)
+	}
+
+	clientCert := func() (*tls.Certificate, error) {
+		return clientCertWatcher.GetCertificate(nil)
+	}
+
 	httpClient := &http.Client{
 		Timeout: 30 * time.Second,
 		Transport: &http.Transport{
-			TLSClientConfig: &tls.Config{
-				InsecureSkipVerify: true,
-				MinVersion:         tls.VersionTLS12,
-				Certificates:       []tls.Certificate{cert},
-			},
+			TLSClientConfig: vmstats.NewVMStatsTLSConfig(caManager, clientCert),
 		},
 	}
 
-	vmStatsClient := vmstats.NewVMStatsClient(httpClient, vmstatsPort)
+	vmStatsClient := vmstats.NewVMStatsClient(httpClient, opts.port)
 	statsCache := vmstats.NewStatsCache()
 
 	if err := vmstats.RegisterCollector(statsCache, allowlist); err != nil {
@@ -502,7 +534,7 @@ func setupVMStats(
 			vmstats.PollerConfig{
 				PollInterval:  30 * time.Second,
 				MaxConcurrent: 10,
-				Port:          vmstatsPort,
+				Port:          opts.port,
 				Policy:        policy,
 			},
 			statsCache,
