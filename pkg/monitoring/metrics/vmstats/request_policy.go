@@ -31,26 +31,22 @@ import (
 type category string
 
 const (
-	catDomainStats               category = "domainStats"
-	catDirtyRate                 category = "dirtyRate"
-	catGuestGetOsInfo            category = "guestGetOsInfo"
-	catGuestGetHostName          category = "guestGetHostName"
-	catGuestGetTimezone          category = "guestGetTimezone"
-	catGuestGetUsers             category = "guestGetUsers"
-	catGuestGetFsInfo            category = "guestGetFsInfo"
-	catGuestNetworkGetInterfaces category = "guestNetworkGetInterfaces"
-	catGuestGetDevices           category = "guestGetDevices"
+	catDomainStats      category = "domainStats"
+	catDirtyRate        category = "dirtyRate"
+	catGuestGetHostName category = "guestGetHostName"
+	catGuestGetTimezone category = "guestGetTimezone"
+	catGuestGetUsers    category = "guestGetUsers"
+	catGuestGetFsInfo   category = "guestGetFsInfo"
+	catGuestGetDevices  category = "guestGetDevices"
 )
 
 var allCategories = []category{
 	catDomainStats,
 	catDirtyRate,
-	catGuestGetOsInfo,
 	catGuestGetHostName,
 	catGuestGetTimezone,
 	catGuestGetUsers,
 	catGuestGetFsInfo,
-	catGuestNetworkGetInterfaces,
 	catGuestGetDevices,
 }
 
@@ -60,7 +56,6 @@ var libvirtCategories = []category{
 }
 
 var guestCommonCategories = []category{
-	catGuestGetOsInfo,
 	catGuestGetHostName,
 	catGuestGetTimezone,
 	catGuestGetFsInfo,
@@ -70,7 +65,6 @@ const windowsFamily = "windows"
 
 var osFamilyCategories = map[string][]category{
 	windowsFamily: {catGuestGetUsers},
-	"linux":       {catGuestNetworkGetInterfaces},
 }
 
 var guestGetDevicesMinAgent = agentVersion{major: 5, minor: 2, known: true}
@@ -80,14 +74,12 @@ var categoryMetrics = map[category][]operatormetrics.Metric{
 		cpuMetricsList, memoryMetricsList, vcpuMetricsList,
 		networkMetricsList, blockMetricsList, dirtyRateMetricsList,
 	),
-	catDirtyRate:                 dirtyRateMetricsList,
-	catGuestGetOsInfo:            {guestOsInfo},
-	catGuestGetHostName:          {guestHostname},
-	catGuestGetTimezone:          {guestTimezone},
-	catGuestGetUsers:             {guestUserCount},
-	catGuestGetFsInfo:            {filesystemCapacityBytes, filesystemUsedBytes},
-	catGuestNetworkGetInterfaces: {guestInterfaceInfo},
-	catGuestGetDevices:           {guestDeviceDriverTimestamp},
+	catDirtyRate:        dirtyRateMetricsList,
+	catGuestGetHostName: {guestHostname},
+	catGuestGetTimezone: {guestTimezone},
+	catGuestGetUsers:    {guestUserCount},
+	catGuestGetFsInfo:   {filesystemCapacityBytes, filesystemUsedBytes},
+	catGuestGetDevices:  {guestDeviceDriverTimestamp},
 }
 
 type RequestPolicy struct {
@@ -141,7 +133,10 @@ func (p *RequestPolicy) Resolve(vmi *k6tv1.VirtualMachineInstance, agentVer stri
 		case version.atLeast(guestGetDevicesMinAgent):
 			set[catGuestGetDevices] = true
 		case agentVer == "":
-			set[catGuestGetOsInfo] = true
+			// Bootstrap: ask for the cheapest guest-agent command so the reply
+			// carries GuestAgentVersion, which gates guest-get-devices. The
+			// agent version is not in the VMI status, so it takes a poll.
+			set[catGuestGetHostName] = true
 		}
 	}
 
@@ -212,8 +207,6 @@ func buildRequest(set map[category]bool) *VMStatsRequest {
 			req.DomainStats = enabled
 		case catDirtyRate:
 			req.DirtyRate = enabled
-		case catGuestGetOsInfo:
-			req.GuestGetOsInfo = enabled
 		case catGuestGetHostName:
 			req.GuestGetHostName = enabled
 		case catGuestGetTimezone:
@@ -222,8 +215,6 @@ func buildRequest(set map[category]bool) *VMStatsRequest {
 			req.GuestGetUsers = enabled
 		case catGuestGetFsInfo:
 			req.GuestGetFsInfo = enabled
-		case catGuestNetworkGetInterfaces:
-			req.GuestNetworkGetInterfaces = enabled
 		case catGuestGetDevices:
 			req.GuestGetDevices = enabled
 		}

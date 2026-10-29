@@ -47,16 +47,8 @@ var _ = Describe("VMStats OS-based request policy", func() {
 			g.Expect(err).ToNot(HaveOccurred())
 			metricsOutput = out
 
-			var found bool
-			for _, l := range metrics.FindMetric(out, "kubevirt_vmi_guest_os_info") {
-				if metrics.HasLabel(l, "name", "e2e-test-vmi") &&
-					metrics.HasLabel(l, "namespace", testVMINamespace) {
-					found = true
-					break
-				}
-			}
-			g.Expect(found).To(BeTrue(),
-				"guest OS info for e2e-test-vmi not reported yet")
+			g.Expect(scopedLines("kubevirt_vmi_guest_hostname")).ToNot(BeEmpty(),
+				"no guest-agent VMStats poll for e2e-test-vmi has landed yet")
 		}, 5*time.Minute, 10*time.Second).Should(Succeed())
 	})
 
@@ -78,15 +70,6 @@ var _ = Describe("VMStats OS-based request policy", func() {
 	It("requests guest-common categories for the guest", func() {
 		Expect(scopedLines("kubevirt_vmi_guest_hostname")).ToNot(BeEmpty())
 		Expect(scopedLines("kubevirt_vmi_guest_timezone")).ToNot(BeEmpty())
-	})
-
-	It("requests the linux-family network interface category", func() {
-		Eventually(func(g Gomega) []metrics.MetricLine {
-			out, err := metrics.Scrape(kvNamespace, metricsServiceName)
-			g.Expect(err).ToNot(HaveOccurred())
-			metricsOutput = out
-			return scopedLines("kubevirt_vmi_guest_interface_info")
-		}, 2*time.Minute, 10*time.Second).ShouldNot(BeEmpty())
 	})
 
 	It("does not request the windows-family categories for a linux guest", func() {

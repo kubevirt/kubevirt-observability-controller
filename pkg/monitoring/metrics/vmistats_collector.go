@@ -20,6 +20,7 @@ package metrics
 
 import (
 	"strconv"
+	"strings"
 
 	"github.com/rhobs/operator-observability-toolkit/pkg/operatormetrics"
 	k8sv1 "k8s.io/api/core/v1"
@@ -28,6 +29,9 @@ import (
 
 	k6tv1 "kubevirt.io/api/core/v1"
 )
+
+// Interface info source reported in VirtualMachineInstanceNetworkInterface,
+const infoSourceGuestAgent = "guest-agent"
 
 var (
 	VMIStatsCollector = operatormetrics.Collector{
@@ -40,6 +44,8 @@ var (
 			vmiVnicInfo,
 			vmiLauncherMemoryOverhead,
 			vmiEphemeralHotplugVolume,
+			vmiGuestOSInfo,
+			vmiGuestInterfaceInfo,
 		},
 		CollectCallback: vmiStatsCollectorCallback,
 	}
@@ -124,6 +130,29 @@ var (
 		},
 		[]string{"namespace", "name", "volume_name"},
 	)
+
+	vmiGuestOSInfo = operatormetrics.NewGaugeVec(
+		operatormetrics.MetricOpts{
+			Name: "kubevirt_vmi_guest_os_info",
+			Help: "Guest OS information reported in the VMI status.",
+		},
+		[]string{
+			"node", "namespace", "name",
+			"os_name", "os_version", "os_id", "kernel_release", "machine",
+		},
+	)
+
+	vmiGuestInterfaceInfo = operatormetrics.NewGaugeVec(
+		operatormetrics.MetricOpts{
+			Name: "kubevirt_vmi_guest_interface_info",
+			Help: "Network interface information reported by the guest agent " +
+				"in the VMI status.",
+		},
+		[]string{
+			"node", "namespace", "name",
+			"interface_name", "network_name", "mac", "ip_address",
+		},
+	)
 )
 
 func vmiStatsCollectorCallback() []operatormetrics.CollectorResult {
@@ -156,6 +185,8 @@ func ReportVMIsStats(
 		crs = append(crs, CollectVMIMigrationTime(vmi)...)
 		crs = append(crs, CollectVMIsVnicInfo(vmi)...)
 		crs = append(crs, collectVMILauncherMemoryOverhead(vmi))
+		crs = append(crs, collectVMIGuestOSInfo(vmi)...)
+		crs = append(crs, collectVMIGuestInterfaces(vmi)...)
 	}
 
 	return crs
@@ -319,6 +350,59 @@ func collectVMIInterfaceInfo(
 		},
 		Value: 1.0,
 	}
+}
+
+func collectVMIGuestOSInfo(
+	vmi *k6tv1.VirtualMachineInstance,
+) []operatormetrics.CollectorResult {
+	info := vmi.Status.GuestOSInfo
+	if info.Name == "" && info.Version == "" && info.ID == "" &&
+		info.KernelRelease == "" && info.Machine == "" {
+		return nil
+	}
+
+	return []operatormetrics.CollectorResult{{
+		Metric: vmiGuestOSInfo,
+		Labels: []string{
+			vmi.Status.NodeName, vmi.Namespace, vmi.Name,
+			info.Name, info.Version, info.ID, info.KernelRelease, info.Machine,
+		},
+		Value: 1.0,
+	}}
+}
+
+func collectVMIGuestInterfaces(
+	vmi *k6tv1.VirtualMachineInstance,
+) []operatormetrics.CollectorResult {
+	interfaces := vmi.Status.Interfaces
+	crs := make([]operatormetrics.CollectorResult, 0, len(interfaces))
+
+	for _, iface := range interfaces {
+		if !guestAgentReported(iface.InfoSource) {
+			continue
+		}
+
+		crs = append(crs, operatormetrics.CollectorResult{
+			Metric: vmiGuestInterfaceInfo,
+			Labels: []string{
+				vmi.Status.NodeName, vmi.Namespace, vmi.Name,
+				iface.InterfaceName, iface.Name, iface.MAC, iface.IP,
+			},
+			Value: 1.0,
+		})
+	}
+
+	return crs
+}
+
+func guestAgentReported(infoSource string) bool {
+	for source := range strings.SplitSeq(infoSource, ",") {
+		if strings.TrimSpace(source) == infoSourceGuestAgent {
+			return true
+		}
+	}
+
+	return false
 }
 
 func CollectVMIMigrationTime(

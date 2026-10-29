@@ -41,13 +41,20 @@ var _ = Describe("resolveVMStatsRequest", func() {
 		Expect(req.DirtyRate).ToNot(BeNil())
 
 		// No guest agent data available, so nothing guest-related is requested.
-		Expect(req.GuestGetOsInfo).To(BeNil())
 		Expect(req.GuestGetHostName).To(BeNil())
 		Expect(req.GuestGetTimezone).To(BeNil())
 		Expect(req.GuestGetUsers).To(BeNil())
 		Expect(req.GuestGetFsInfo).To(BeNil())
-		Expect(req.GuestNetworkGetInterfaces).To(BeNil())
 		Expect(req.GuestGetDevices).To(BeNil())
+	})
+
+	It("never requests categories the VMI status already answers", func() {
+		for _, id := range []string{"", "rhel", "mswindows"} {
+			req := NewRequestPolicy(nil).Resolve(vmiWithOSID(id), "8.2.0")
+
+			Expect(req.GuestGetOsInfo).To(BeNil(), "os info comes from status.guestOSInfo")
+			Expect(req.GuestNetworkGetInterfaces).To(BeNil(), "interfaces come from status.interfaces")
+		}
 	})
 
 	It("adds guest-common and Windows categories for mswindows guests", func() {
@@ -55,7 +62,6 @@ var _ = Describe("resolveVMStatsRequest", func() {
 
 		Expect(req.DomainStats).ToNot(BeNil())
 		Expect(req.DirtyRate).ToNot(BeNil())
-		Expect(req.GuestGetOsInfo).ToNot(BeNil())
 		Expect(req.GuestGetHostName).ToNot(BeNil())
 		Expect(req.GuestGetTimezone).ToNot(BeNil())
 		// Filesystem info is guest-common (every guest has filesystems).
@@ -63,22 +69,16 @@ var _ = Describe("resolveVMStatsRequest", func() {
 
 		Expect(req.GuestGetUsers).ToNot(BeNil())
 		Expect(req.GuestGetDevices).ToNot(BeNil())
-
-		// Network interfaces are a Linux-family extra, not requested for Windows.
-		Expect(req.GuestNetworkGetInterfaces).To(BeNil())
 	})
 
-	It("adds guest-common and Linux categories for a known Linux distro", func() {
+	It("adds only guest-common categories for a known Linux distro", func() {
 		req := NewRequestPolicy(nil).Resolve(vmiWithOSID("rhel"), "8.2.0")
 
 		Expect(req.DomainStats).ToNot(BeNil())
 		Expect(req.DirtyRate).ToNot(BeNil())
-		Expect(req.GuestGetOsInfo).ToNot(BeNil())
 		Expect(req.GuestGetHostName).ToNot(BeNil())
 		Expect(req.GuestGetTimezone).ToNot(BeNil())
 		Expect(req.GuestGetFsInfo).ToNot(BeNil())
-
-		Expect(req.GuestNetworkGetInterfaces).ToNot(BeNil())
 
 		// Users and devices are Windows-family extras, not requested for Linux.
 		Expect(req.GuestGetUsers).To(BeNil())
@@ -88,9 +88,7 @@ var _ = Describe("resolveVMStatsRequest", func() {
 	It("treats any non-empty, non-Windows ID as Linux", func() {
 		req := NewRequestPolicy(nil).Resolve(vmiWithOSID("some-new-distro"), "8.2.0")
 
-		Expect(req.GuestGetOsInfo).ToNot(BeNil())
 		Expect(req.GuestGetFsInfo).ToNot(BeNil())
-		Expect(req.GuestNetworkGetInterfaces).ToNot(BeNil())
 		Expect(req.GuestGetUsers).To(BeNil())
 		Expect(req.GuestGetDevices).To(BeNil())
 	})
@@ -123,7 +121,6 @@ var _ = Describe("resolveVMStatsRequest", func() {
 
 		Expect(req.GuestGetUsers).ToNot(BeNil())
 		Expect(req.GuestGetDevices).ToNot(BeNil())
-		Expect(req.GuestNetworkGetInterfaces).To(BeNil())
 	})
 })
 
@@ -149,11 +146,12 @@ var _ = Describe("RequestPolicy.Resolve under a restricted allowlist", func() {
 		Expect(req.GuestNetworkGetInterfaces).To(BeNil())
 	})
 
-	It("bootstraps with guest-get-osinfo when no poll has reported a version yet", func() {
+	It("bootstraps with guest-get-hostname when no poll has reported a version yet", func() {
 		req := deviceOnly().Resolve(vmiWithOSID("mswindows"), "")
 
 		Expect(req).ToNot(BeNil())
-		Expect(req.GuestGetOsInfo).ToNot(BeNil())
+		Expect(req.GuestGetHostName).ToNot(BeNil(),
+			"the reply has to carry GuestAgentVersion before devices can be gated")
 		Expect(req.GuestGetDevices).To(BeNil())
 		Expect(req.DomainStats).To(BeNil())
 	})
@@ -277,12 +275,10 @@ var _ = Describe("buildRequest", func() {
 
 		Expect(req.DomainStats).ToNot(BeNil())
 		Expect(req.DirtyRate).ToNot(BeNil())
-		Expect(req.GuestGetOsInfo).ToNot(BeNil())
 		Expect(req.GuestGetHostName).ToNot(BeNil())
 		Expect(req.GuestGetTimezone).ToNot(BeNil())
 		Expect(req.GuestGetUsers).ToNot(BeNil())
 		Expect(req.GuestGetFsInfo).ToNot(BeNil())
-		Expect(req.GuestNetworkGetInterfaces).ToNot(BeNil())
 		Expect(req.GuestGetDevices).ToNot(BeNil())
 	})
 })
