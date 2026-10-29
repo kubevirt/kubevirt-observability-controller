@@ -30,6 +30,11 @@ type Stores struct {
 	ClusterPreference   cache.Store
 	ControllerRevision  cache.Store
 	VirtHandlerPod      cache.Store
+	VMSnapshot          cache.Store
+	VMRestore           cache.Store
+	VMExport            cache.Store
+	VMClone             cache.Store
+	VMPool              cache.Store
 }
 
 type Indexers struct {

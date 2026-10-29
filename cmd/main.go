@@ -41,8 +41,12 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
+	clonev1 "kubevirt.io/api/clone/v1beta1"
 	k6tv1 "kubevirt.io/api/core/v1"
+	exportv1 "kubevirt.io/api/export/v1"
 	instancetypev1beta1 "kubevirt.io/api/instancetype/v1beta1"
+	poolv1 "kubevirt.io/api/pool/v1beta1"
+	snapshotv1 "kubevirt.io/api/snapshot/v1beta1"
 	ctrl "sigs.k8s.io/controller-runtime"
 	ctrlcache "sigs.k8s.io/controller-runtime/pkg/cache"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -73,6 +77,10 @@ func init() {
 	utilruntime.Must(monitoringv1.AddToScheme(scheme))
 	utilruntime.Must(k6tv1.AddToScheme(scheme))
 	utilruntime.Must(instancetypev1beta1.AddToScheme(scheme))
+	utilruntime.Must(snapshotv1.AddToScheme(scheme))
+	utilruntime.Must(exportv1.AddToScheme(scheme))
+	utilruntime.Must(clonev1.AddToScheme(scheme))
+	utilruntime.Must(poolv1.AddToScheme(scheme))
 
 	// +kubebuilder:scaffold:scheme
 }

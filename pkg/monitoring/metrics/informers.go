@@ -25,8 +25,12 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	k8sv1 "k8s.io/api/core/v1"
 	toolscache "k8s.io/client-go/tools/cache"
+	clonev1 "kubevirt.io/api/clone/v1beta1"
 	k6tv1 "kubevirt.io/api/core/v1"
+	exportv1 "kubevirt.io/api/export/v1"
 	instancetypev1beta1 "kubevirt.io/api/instancetype/v1beta1"
+	poolv1 "kubevirt.io/api/pool/v1beta1"
+	snapshotv1 "kubevirt.io/api/snapshot/v1beta1"
 	ctrlcache "sigs.k8s.io/controller-runtime/pkg/cache"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
@@ -111,6 +115,31 @@ func SetupInformers(ctx context.Context, c ctrlcache.Cache) error {
 		return fmt.Errorf("pod: %w", err)
 	}
 
+	vmSnapshot, err := informerFor(ctx, c, &snapshotv1.VirtualMachineSnapshot{})
+	if err != nil {
+		return fmt.Errorf("VMSnapshot: %w", err)
+	}
+
+	vmRestore, err := informerFor(ctx, c, &snapshotv1.VirtualMachineRestore{})
+	if err != nil {
+		return fmt.Errorf("VMRestore: %w", err)
+	}
+
+	vmExport, err := informerFor(ctx, c, &exportv1.VirtualMachineExport{})
+	if err != nil {
+		return fmt.Errorf("VMExport: %w", err)
+	}
+
+	vmClone, err := informerFor(ctx, c, &clonev1.VirtualMachineClone{})
+	if err != nil {
+		return fmt.Errorf("VMClone: %w", err)
+	}
+
+	vmPool, err := informerFor(ctx, c, &poolv1.VirtualMachinePool{})
+	if err != nil {
+		return fmt.Errorf("VMPool: %w", err)
+	}
+
 	SetStores(
 		&Stores{
 			VM:                  vm.GetStore(),
@@ -122,6 +151,11 @@ func SetupInformers(ctx context.Context, c ctrlcache.Cache) error {
 			ClusterPreference:   clusterPreference.GetStore(),
 			ControllerRevision:  controllerRevision.GetStore(),
 			VirtHandlerPod:      pod.GetStore(),
+			VMSnapshot:          vmSnapshot.GetStore(),
+			VMRestore:           vmRestore.GetStore(),
+			VMExport:            vmExport.GetStore(),
+			VMClone:             vmClone.GetStore(),
+			VMPool:              vmPool.GetStore(),
 		},
 		&Indexers{
 			VMIMigration: vmim.GetIndexer(),
