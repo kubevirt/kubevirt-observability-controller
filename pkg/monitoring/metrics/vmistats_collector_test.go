@@ -200,7 +200,7 @@ var _ = Describe("VMI Stats Collector", func() {
 	})
 
 	Describe("collectVMIGuestInterfaces", func() {
-		It("should collect one series per status interface", func() {
+		It("should collect one series per guest agent reported interface", func() {
 			vmi := &k6tv1.VirtualMachineInstance{
 				ObjectMeta: metav1.ObjectMeta{Name: "vmi1", Namespace: "ns1"},
 				Status: k6tv1.VirtualMachineInstanceStatus{
@@ -212,10 +212,13 @@ var _ = Describe("VMI Stats Collector", func() {
 							MAC:           "f6:98:90:b9:bd:70",
 							IP:            "10.0.2.2",
 							IPs:           []string{"10.0.2.2", "fd10::2"},
+							InfoSource:    "domain, guest-agent, multus-status",
 						},
 						{
-							Name: "secondary",
-							MAC:  "02:11:22:33:44:55",
+							Name:          "secondary",
+							InterfaceName: "eth1",
+							MAC:           "02:11:22:33:44:55",
+							InfoSource:    "guest-agent",
 						},
 					},
 				},
@@ -231,9 +234,66 @@ var _ = Describe("VMI Stats Collector", func() {
 			}))
 			Expect(results[1].Labels).To(Equal([]string{
 				"node1", "ns1", "vmi1",
-				"", "secondary", "02:11:22:33:44:55", "",
+				"eth1", "secondary", "02:11:22:33:44:55", "",
 			}))
 		})
+
+		It("should skip interfaces the guest agent did not report", func() {
+			vmi := &k6tv1.VirtualMachineInstance{
+				ObjectMeta: metav1.ObjectMeta{Name: "vmi1", Namespace: "ns1"},
+				Status: k6tv1.VirtualMachineInstanceStatus{
+					NodeName: "node1",
+					Interfaces: []k6tv1.VirtualMachineInstanceNetworkInterface{
+						{
+							Name:       "default",
+							MAC:        "f6:98:90:b9:bd:70",
+							IP:         "10.0.2.2",
+							InfoSource: "domain, multus-status",
+						},
+						{
+							Name:          "reported",
+							InterfaceName: "eth1",
+							MAC:           "02:11:22:33:44:55",
+							InfoSource:    "domain,guest-agent",
+						},
+					},
+				},
+			}
+
+			results := collectVMIGuestInterfaces(vmi)
+
+			Expect(results).To(HaveLen(1))
+			Expect(results[0].Labels).To(Equal([]string{
+				"node1", "ns1", "vmi1",
+				"eth1", "reported", "02:11:22:33:44:55", "",
+			}))
+		})
+
+		DescribeTable("should match the guest agent info source exactly",
+			func(infoSource string, expectedSeries int) {
+				vmi := &k6tv1.VirtualMachineInstance{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "vmi1", Namespace: "ns1",
+					},
+					Status: k6tv1.VirtualMachineInstanceStatus{
+						Interfaces: []k6tv1.VirtualMachineInstanceNetworkInterface{
+							{Name: "default", InfoSource: infoSource},
+						},
+					},
+				}
+
+				Expect(collectVMIGuestInterfaces(vmi)).
+					To(HaveLen(expectedSeries))
+			},
+			Entry("single source", "guest-agent", 1),
+			Entry("comma separated", "domain,guest-agent", 1),
+			Entry("space separated", "domain, guest-agent", 1),
+			Entry("trailing source", "domain, guest-agent, multus-status", 1),
+			Entry("domain only", "domain", 0),
+			Entry("multus only", "multus-status", 0),
+			Entry("unset", "", 0),
+			Entry("substring match", "not-guest-agent", 0),
+		)
 
 		It("should report nothing when the VMI status has no interfaces", func() {
 			vmi := &k6tv1.VirtualMachineInstance{

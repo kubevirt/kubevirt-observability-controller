@@ -20,6 +20,7 @@ package metrics
 
 import (
 	"strconv"
+	"strings"
 
 	"github.com/rhobs/operator-observability-toolkit/pkg/operatormetrics"
 	k8sv1 "k8s.io/api/core/v1"
@@ -28,6 +29,9 @@ import (
 
 	k6tv1 "kubevirt.io/api/core/v1"
 )
+
+// Interface info source reported in VirtualMachineInstanceNetworkInterface,
+const infoSourceGuestAgent = "guest-agent"
 
 var (
 	VMIStatsCollector = operatormetrics.Collector{
@@ -141,7 +145,8 @@ var (
 	vmiGuestInterfaceInfo = operatormetrics.NewGaugeVec(
 		operatormetrics.MetricOpts{
 			Name: "kubevirt_vmi_guest_interface_info",
-			Help: "Guest network interface information reported in the VMI status.",
+			Help: "Network interface information reported by the guest agent " +
+				"in the VMI status.",
 		},
 		[]string{
 			"node", "namespace", "name",
@@ -373,6 +378,10 @@ func collectVMIGuestInterfaces(
 	crs := make([]operatormetrics.CollectorResult, 0, len(interfaces))
 
 	for _, iface := range interfaces {
+		if !guestAgentReported(iface.InfoSource) {
+			continue
+		}
+
 		crs = append(crs, operatormetrics.CollectorResult{
 			Metric: vmiGuestInterfaceInfo,
 			Labels: []string{
@@ -384,6 +393,16 @@ func collectVMIGuestInterfaces(
 	}
 
 	return crs
+}
+
+func guestAgentReported(infoSource string) bool {
+	for source := range strings.SplitSeq(infoSource, ",") {
+		if strings.TrimSpace(source) == infoSourceGuestAgent {
+			return true
+		}
+	}
+
+	return false
 }
 
 func CollectVMIMigrationTime(
