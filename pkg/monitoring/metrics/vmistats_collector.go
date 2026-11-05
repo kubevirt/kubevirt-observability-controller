@@ -110,6 +110,7 @@ var (
 		[]string{
 			"name", "namespace", "vnic_name",
 			"binding_type", "network", "binding_name", "model",
+			"pod_interface_name",
 		},
 	)
 
@@ -473,6 +474,7 @@ func CollectVMIsVnicInfo(
 		[]operatormetrics.CollectorResult, 0, len(interfaces),
 	)
 	networks := vmi.Spec.Networks
+	podInterfaceNames := podInterfaceNamesByVnic(vmi)
 
 	for _, iface := range interfaces {
 		model := ModelNone
@@ -490,10 +492,25 @@ func CollectVMIsVnicInfo(
 			Labels: []string{
 				vmi.Name, vmi.Namespace, iface.Name,
 				bindingType, networkName, bindingName, model,
+				podInterfaceNames[iface.Name],
 			},
 			Value: 1.0,
 		})
 	}
 
 	return results
+}
+
+// podInterfaceNamesByVnic maps a vNIC's logical name to the pod network
+// interface name reported for it in the VMI status (e.g. eth0,
+// pod914f438d88d). The name is empty when the status has no matching entry yet.
+func podInterfaceNamesByVnic(
+	vmi *k6tv1.VirtualMachineInstance,
+) map[string]string {
+	names := make(map[string]string, len(vmi.Status.Interfaces))
+	for _, iface := range vmi.Status.Interfaces {
+		names[iface.Name] = iface.PodInterfaceName
+	}
+
+	return names
 }

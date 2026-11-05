@@ -305,6 +305,72 @@ var _ = Describe("VMI Stats Collector", func() {
 		})
 	})
 
+	Describe("CollectVMIsVnicInfo", func() {
+		newVMIWithInterfaces := func(
+			status []k6tv1.VirtualMachineInstanceNetworkInterface,
+		) *k6tv1.VirtualMachineInstance {
+			return &k6tv1.VirtualMachineInstance{
+				ObjectMeta: metav1.ObjectMeta{Name: "vmi1", Namespace: "ns1"},
+				Spec: k6tv1.VirtualMachineInstanceSpec{
+					Domain: k6tv1.DomainSpec{
+						Devices: k6tv1.Devices{
+							Interfaces: []k6tv1.Interface{
+								{
+									Name:                   "default",
+									InterfaceBindingMethod: k6tv1.InterfaceBindingMethod{Masquerade: &k6tv1.InterfaceMasquerade{}},
+								},
+								{
+									Name:                   "secondary",
+									InterfaceBindingMethod: k6tv1.InterfaceBindingMethod{Bridge: &k6tv1.InterfaceBridge{}},
+								},
+							},
+						},
+					},
+					Networks: []k6tv1.Network{
+						{Name: "default", NetworkSource: k6tv1.NetworkSource{Pod: &k6tv1.PodNetwork{}}},
+						{Name: "secondary", NetworkSource: k6tv1.NetworkSource{Multus: &k6tv1.MultusNetwork{NetworkName: "my-net"}}},
+					},
+				},
+				Status: k6tv1.VirtualMachineInstanceStatus{Interfaces: status},
+			}
+		}
+
+		It("should populate pod_interface_name from the matching status entry", func() {
+			vmi := newVMIWithInterfaces([]k6tv1.VirtualMachineInstanceNetworkInterface{
+				{Name: "default", PodInterfaceName: "eth0"},
+				{Name: "secondary", PodInterfaceName: "pod914f438d88d"},
+			})
+
+			results := CollectVMIsVnicInfo(vmi)
+
+			Expect(results).To(HaveLen(2))
+			Expect(results[0].Labels).To(Equal([]string{
+				"vmi1", "ns1", "default",
+				"core", "pod networking", "masquerade", ModelNone, "eth0",
+			}))
+			Expect(results[1].Labels).To(Equal([]string{
+				"vmi1", "ns1", "secondary",
+				"core", "my-net", "bridge", ModelNone, "pod914f438d88d",
+			}))
+		})
+
+		It("should leave pod_interface_name empty when the status has no matching entry", func() {
+			vmi := newVMIWithInterfaces(nil)
+
+			results := CollectVMIsVnicInfo(vmi)
+
+			Expect(results).To(HaveLen(2))
+			Expect(results[0].Labels).To(Equal([]string{
+				"vmi1", "ns1", "default",
+				"core", "pod networking", "masquerade", ModelNone, "",
+			}))
+			Expect(results[1].Labels).To(Equal([]string{
+				"vmi1", "ns1", "secondary",
+				"core", "my-net", "bridge", ModelNone, "",
+			}))
+		})
+	})
+
 	Describe("CollectVMIMigrationTime", func() {
 		It("should return empty when no migration state", func() {
 			vmi := &k6tv1.VirtualMachineInstance{
