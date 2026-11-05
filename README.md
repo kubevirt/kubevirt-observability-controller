@@ -55,7 +55,7 @@ make build
 ```sh
 make test        # unit tests, Go rule linters, and localized promtool tests
 make check       # all unit/rule tests plus the metric-name linter
-make test-e2e    # end-to-end tests (requires kubevirtci cluster)
+make test-e2e    # end-to-end tests and published runbook checks (requires kubevirtci cluster)
 ```
 
 ### Lint
@@ -72,6 +72,12 @@ make prom-rules-verify # alias for test-rules
 To use an existing executable, set `PROMTOOL=/absolute/path/to/promtool`.
 `make check` also runs `lint-metrics`, which needs `docker` or `podman`
 (`CONTAINER_TOOL`, default `docker`).
+
+`make test-e2e` checks each deployed alert's `runbook_url` with an HTTP HEAD
+request and requires HTTP 200, as in KubeVirt. Merge the runbook into
+`kubevirt/monitoring` and wait for it to be published before adding an alert.
+Missing runbooks and network errors fail the check. The required
+`pull-koc-functest` presubmit runs this suite through `automation/test.sh`.
 
 Place rule fixtures beside their definitions under `pkg/monitoring/rules/`,
 using the suffix `_test.promtool.yml` and `rule_files: [rules.yaml]`.
