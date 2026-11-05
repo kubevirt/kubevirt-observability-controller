@@ -102,7 +102,7 @@ make build
 ```sh
 make test        # unit tests, Go rule linters, localized promtool tests, group defaults
 make check       # all unit/rule tests plus the metric-name linter
-make test-e2e    # end-to-end tests (requires kubevirtci cluster)
+make test-e2e    # end-to-end tests and published runbook checks (requires kubevirtci cluster)
 ```
 
 ### Lint
@@ -125,6 +125,12 @@ flag against the KubeVirt release `hack/kubevirt.sh` pins. It clones that
 checkout into `_kubevirt/` first; the test skips without one, so run it through
 the target rather than as a bare `go test`. Point it at an existing clone with
 `KUBEVIRT_DIR=/path/to/kubevirt go test ./test/origins/`.
+
+`make test-e2e` checks each deployed alert's `runbook_url` with an HTTP HEAD
+request and requires HTTP 200, as in KubeVirt. Merge the runbook into
+`kubevirt/monitoring` and wait for it to be published before adding an alert.
+Missing runbooks and network errors fail the check. The required
+`pull-koc-functest` presubmit runs this suite through `automation/test.sh`.
 
 Place rule fixtures beside their definitions under `pkg/monitoring/rules/`,
 using the suffix `_test.promtool.yml` and `rule_files: [rules.yaml]`.
