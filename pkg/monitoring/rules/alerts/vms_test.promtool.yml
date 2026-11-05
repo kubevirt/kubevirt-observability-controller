@@ -45,3 +45,54 @@ tests:
       - alertname: OutdatedGuestDeviceDrivers
         eval_time: 70m
         exp_alerts: []
+
+  - name: KubeVirtVMIOrdinalPodInterfaceName fires for a running VMI with an ordinal interface
+    interval: 1m
+    input_series:
+      # Primary pod interface is always eth0; the ordinal secondary is net1.
+      - series: 'kubevirt_vmi_vnic_info{namespace="default",name="vm-ordinal",vnic_name="default",pod_interface_name="eth0"}'
+        values: '1x10'
+      - series: 'kubevirt_vmi_vnic_info{namespace="default",name="vm-ordinal",vnic_name="secondary",pod_interface_name="net1"}'
+        values: '1x10'
+      - series: 'kubevirt_vmi_info{namespace="default",name="vm-ordinal",phase="running"}'
+        values: '1x10'
+    alert_rule_test:
+      - alertname: KubeVirtVMIOrdinalPodInterfaceName
+        eval_time: 4m
+        exp_alerts: []
+      - alertname: KubeVirtVMIOrdinalPodInterfaceName
+        eval_time: 6m
+        exp_alerts:
+          - exp_labels:
+              namespace: default
+              name: vm-ordinal
+              severity: warning
+              operator_health_impact: none
+              kubernetes_operator_part_of: kubevirt
+              kubernetes_operator_component: kubevirt
+            exp_annotations:
+              summary: "A VirtualMachineInstance uses the deprecated ordinal pod network interface naming scheme."
+              description: "VirtualMachineInstance vm-ordinal in namespace default uses the deprecated ordinal pod network interface naming scheme. Live-migrate it once, or stop and start it, to adopt the new naming scheme."
+              runbook_url: "https://kubevirt.io/monitoring/runbooks/KubeVirtVMIOrdinalPodInterfaceName"
+
+  - name: KubeVirtVMIOrdinalPodInterfaceName does not fire for non-ordinal or non-running VMIs
+    interval: 1m
+    input_series:
+      # Running VMI with an eth0 primary and a hashed (new scheme) secondary.
+      - series: 'kubevirt_vmi_vnic_info{namespace="default",name="vm-hashed",vnic_name="default",pod_interface_name="eth0"}'
+        values: '1x10'
+      - series: 'kubevirt_vmi_vnic_info{namespace="default",name="vm-hashed",vnic_name="secondary",pod_interface_name="pod16477688c0e"}'
+        values: '1x10'
+      - series: 'kubevirt_vmi_info{namespace="default",name="vm-hashed",phase="running"}'
+        values: '1x10'
+      # Ordinal secondary, but the VMI is not running.
+      - series: 'kubevirt_vmi_vnic_info{namespace="default",name="vm-stopped",vnic_name="default",pod_interface_name="eth0"}'
+        values: '1x10'
+      - series: 'kubevirt_vmi_vnic_info{namespace="default",name="vm-stopped",vnic_name="secondary",pod_interface_name="net1"}'
+        values: '1x10'
+      - series: 'kubevirt_vmi_info{namespace="default",name="vm-stopped",phase="succeeded"}'
+        values: '1x10'
+    alert_rule_test:
+      - alertname: KubeVirtVMIOrdinalPodInterfaceName
+        eval_time: 6m
+        exp_alerts: []

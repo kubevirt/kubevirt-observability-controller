@@ -291,4 +291,26 @@ var vmsAlerts = []promv1.Rule{
 			operatorHealthImpactLabelKey: "none",
 		},
 	},
+	{
+		Alert: "KubeVirtVMIOrdinalPodInterfaceName",
+		Expr: intstr.FromString(
+			"count by (namespace, name) (" +
+				"kubevirt_vmi_vnic_info{pod_interface_name=~'net[0-9]+'}" +
+				") and on (namespace, name) " +
+				"kubevirt_vmi_info{phase='running'}",
+		),
+		For: ptr.To(promv1.Duration("5m")),
+		Annotations: map[string]string{
+			summaryAnnotationKey: "A VirtualMachineInstance uses the deprecated " +
+				"ordinal pod network interface naming scheme.",
+			descriptionAnnotationKey: "VirtualMachineInstance {{ $labels.name }} in " +
+				"namespace {{ $labels.namespace }} uses the deprecated ordinal pod " +
+				"network interface naming scheme. Live-migrate it once, or stop and " +
+				"start it, to adopt the new naming scheme.",
+		},
+		Labels: map[string]string{
+			severityAlertLabelKey:        "warning",
+			operatorHealthImpactLabelKey: "none",
+		},
+	},
 }

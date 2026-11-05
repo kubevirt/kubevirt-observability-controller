@@ -111,6 +111,7 @@ var _ = Describe("Alerts", func() {
 			"GuestFilesystemAlmostOutOfSpace":                 true,
 			"VirtualMachineInstanceHasEphemeralHotplugVolume": true,
 			"KubeVirtVMGuestMemoryAvailableLow":               true,
+			"KubeVirtVMIOrdinalPodInterfaceName":              true,
 		}
 
 		var sawComponent, sawVM bool
