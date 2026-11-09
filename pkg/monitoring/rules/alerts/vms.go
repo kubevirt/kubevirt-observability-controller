@@ -26,9 +26,41 @@ import (
 	"k8s.io/utils/ptr"
 )
 
-const excludedFilesystemTypesRegex = "CDFS|iso9660|udf|squashfs|cramfs|tmpfs|devtmpfs|proc|" +
-	"sysfs|selinuxfs|securityfs|pstore|debugfs|tracefs|configfs|binfmt_misc|bpf|devpts|" +
-	"mqueue|nsfs|rpc_pipefs|ramfs|rootfs|overlay|cgroup.*|fuse\\\\..*|fusectl"
+// excludedFilesystemTypesRegex contains filesystem types that should be ignored by space-usage alerts.
+// Rationale:
+// - Read-only image filesystems often appear 100% used and are not actionable for capacity (iso9660/CDFS, udf, squashfs, cramfs).
+// - Windows QEMU Guest Agent reports optical media as CDFS (ISO 9660) or UDF, with casing that varies
+// by guest; Linux reports iso9660/udf. Matching is case-insensitive so CDROMs (0 bytes free by definition)
+// do not fire GuestFilesystemAlmostOutOfSpace.
+// - Pseudo/kernel/ephemeral filesystems are not meaningful indicators of guest disk pressure
+// (e.g., tmpfs, proc, sysfs, cgroup*, overlay, fuse.*).
+// Keep this list aligned with common node_exporter exclusions to minimize noise in alerts.
+const excludedFilesystemTypesRegex = "(?i)CDFS|iso9660|udf|squashfs|cramfs|tmpfs|devtmpfs|proc|sysfs|selinuxfs|securityfs|pstore|debugfs|" +
+	"tracefs|configfs|binfmt_misc|bpf|devpts|mqueue|nsfs|rpc_pipefs|ramfs|rootfs|overlay|cgroup.*|fuse\\\\..*|fusectl"
+
+// guestFilesystemUsagePercentExpr is used/capacity * 100 for guest filesystems that
+// represent real, writable capacity (excludes optical/pseudo filesystems and Windows
+// "System Reserved").
+var guestFilesystemUsagePercentExpr = fmt.Sprintf(
+	"(kubevirt_vmi_filesystem_used_bytes{%[1]s} / kubevirt_vmi_filesystem_capacity_bytes{%[1]s})*100",
+	fmt.Sprintf(
+		"namespace!='',file_system_type!~'%s',mount_point!='System Reserved'",
+		excludedFilesystemTypesRegex,
+	),
+)
+
+// withVMLabel wraps a PromQL expression with label_replace to add a "vm"
+// typed resource label derived from the "name" label. This enables the
+// monitoring-plugin to navigate from alerts to the VM resource page.
+func withVMLabel(expr string) string {
+	return withVMLabelFrom(expr, "name")
+}
+
+// withVMLabelFrom is like withVMLabel but copies from sourceLabel instead of
+// "name" (e.g. KubeVirtVMIExcessiveMigrations exposes "vmi").
+func withVMLabelFrom(expr, sourceLabel string) string {
+	return fmt.Sprintf(`label_replace(%s, "vm", "$1", %q, "(.+)")`, expr, sourceLabel)
+}
 
 var vmiStatusAlerts = []promv1.Rule{
 	{
@@ -66,10 +98,10 @@ var vmiStatusAlerts = []promv1.Rule{
 	},
 	{
 		Alert: "VMCannotBeEvicted",
-		Expr: intstr.FromString(
+		Expr: intstr.FromString(withVMLabel(
 			"kubevirt_vmi_non_evictable * on(name, namespace) group_left() " +
-				"kubevirt_vmi_info{phase='running'} == 1",
-		),
+				"topk by(name, namespace) (1, kubevirt_vmi_info{phase='running'}) == 1",
+		)),
 		For: ptr.To(promv1.Duration("1m")),
 		Annotations: map[string]string{
 			descriptionAnnotationKey: "Eviction policy for VirtualMachine {{ $labels.name }} " +
@@ -85,7 +117,7 @@ var vmiStatusAlerts = []promv1.Rule{
 	},
 	{
 		Alert: "OutdatedVirtualMachineInstanceWorkloads",
-		Expr:  intstr.FromString("kubevirt_vmi_number_of_outdated != 0"),
+		Expr:  intstr.FromString("kubevirt_vmi_number_of_outdated{namespace!=''} != 0"),
 		For:   ptr.To(promv1.Duration("24h")),
 		Annotations: map[string]string{
 			summaryAnnotationKey: "Some running VMIs are still active in outdated pods after " +
@@ -96,17 +128,40 @@ var vmiStatusAlerts = []promv1.Rule{
 			operatorHealthImpactLabelKey: "none",
 		},
 	},
+	{
+		Alert: "VMNonRecoverableOSPanic",
+		Expr: intstr.FromString(withVMLabel(`
+			floor(
+				(
+					sum by (namespace, name) (kubevirt_vmi_guest_os_panic_total)
+					unless
+					sum by (namespace, name) (kubevirt_vmi_guest_os_panic_total offset 24h)
+				)
+				or
+				sum by (namespace, name) (increase(kubevirt_vmi_guest_os_panic_total[24h]))
+			) > 5
+		`)),
+		For: ptr.To(promv1.Duration("1m")),
+		Annotations: map[string]string{
+			summaryAnnotationKey:     "VM {{ $labels.name }} in namespace {{ $labels.namespace }} experienced a non-recoverable guest OS panic",
+			descriptionAnnotationKey: "The VM has experienced {{ $value }} non-recoverable guest OS panic(s) in the last 24 hours.",
+		},
+		Labels: map[string]string{
+			severityAlertLabelKey:        "critical",
+			operatorHealthImpactLabelKey: "none",
+		},
+	},
 }
 
 var vmStatusAlerts = []promv1.Rule{
 	{
 		Alert: "VirtualMachineStuckInUnhealthyState",
-		Expr: intstr.FromString(
+		Expr: intstr.FromString(withVMLabel(
 			"sum by (name, namespace, status)(kubevirt_vm_info{status='provisioning'}==1 or " +
 				"kubevirt_vm_info{status='starting'} == 1 " +
 				"or kubevirt_vm_info{status='terminating'} == 1 or kubevirt_vm_info{status_group='error'} == 1) " +
 				"unless on(name, namespace) kubevirt_vmi_info",
-		),
+		)),
 		For: ptr.To(promv1.Duration("10m")),
 		Annotations: map[string]string{
 			summaryAnnotationKey: "Virtual machine in {{ $labels.status }} state for more than 10 minutes",
@@ -120,13 +175,13 @@ var vmStatusAlerts = []promv1.Rule{
 	},
 	{
 		Alert: "VirtualMachineStuckOnNode",
-		Expr: intstr.FromString(
+		Expr: intstr.FromString(withVMLabel(
 			"sum by (name, namespace, status, node)((kubevirt_vm_info{status='starting'} == 1 " +
 				"or kubevirt_vm_info{status='stopping'} == 1 or kubevirt_vm_info{status='terminating'} == 1 " +
 				"or (kubevirt_vm_info{status_group='error'} == 1 " +
-				"and on(name, namespace) kubevirt_vmi_info) ) " +
-				"* on(name, namespace) group_left(node) kubevirt_vmi_info)",
-		),
+				"and on(name, namespace) kubevirt_vmi_info{phase=~'scheduled|running'}) ) " +
+				"* on(name, namespace) group_left(node) topk by(name, namespace) (1, kubevirt_vmi_info{phase=~'scheduled|running'}))",
+		)),
 		For: ptr.To(promv1.Duration("5m")),
 		Annotations: map[string]string{
 			summaryAnnotationKey: "Virtual machine stuck in unhealthy state for more than 5 minutes",
@@ -144,10 +199,10 @@ var vmStatusAlerts = []promv1.Rule{
 var vmiMigrationAlerts = []promv1.Rule{
 	{
 		Alert: "KubeVirtVMIExcessiveMigrations",
-		Expr: intstr.FromString(
-			"sum by (vmi, namespace) (topk by (vmi, namespace, vmim) " +
-				"(1, max_over_time(kubevirt_vmi_migration_succeeded[1d]))) >= 12",
-		),
+		Expr: intstr.FromString(withVMLabelFrom(
+			"sum by (vmi, namespace) (topk by (vmi, namespace, vmim) (1, max_over_time(kubevirt_vmi_migration_succeeded[1d]))) >= 12",
+			"vmi",
+		)),
 		Annotations: map[string]string{
 			descriptionAnnotationKey: "VirtualMachineInstance {{ $labels.vmi }} in namespace " +
 				"{{ $labels.namespace }} has been migrated more than 12 times during the last 24 hours",
@@ -164,7 +219,7 @@ var vmiMigrationAlerts = []promv1.Rule{
 var vmiCPUAlerts = []promv1.Rule{
 	{
 		Alert: "GuestVCPUQueueHighWarning",
-		Expr:  intstr.FromString("vmi:kubevirt_vmi_guest_queue_length:sum > 10"),
+		Expr:  intstr.FromString(withVMLabel("vmi:kubevirt_vmi_guest_queue_length:sum{namespace!=''} > 10")),
 		Annotations: map[string]string{
 			descriptionAnnotationKey: "VirtualMachineInstance {{ $labels.name }} CPU queue length > 10",
 			summaryAnnotationKey:     "Guest vCPU Queue within collection cycle > 10",
@@ -176,7 +231,7 @@ var vmiCPUAlerts = []promv1.Rule{
 	},
 	{
 		Alert: "GuestVCPUQueueHighCritical",
-		Expr:  intstr.FromString("vmi:kubevirt_vmi_guest_queue_length:sum > 20"),
+		Expr:  intstr.FromString(withVMLabel("vmi:kubevirt_vmi_guest_queue_length:sum{namespace!=''} > 20")),
 		Annotations: map[string]string{
 			descriptionAnnotationKey: "VirtualMachineInstance {{ $labels.name }} CPU queue length > 20",
 			summaryAnnotationKey:     "Guest vCPU Queue within collection cycle > 20",
@@ -193,11 +248,11 @@ var vmiMemoryAlerts = []promv1.Rule{
 		Alert: "KubeVirtVMGuestMemoryPressure",
 		Expr: intstr.FromString("((" +
 			"(vmi:kubevirt_vmi_memory_headroom_ratio:sum < 0.05) and (vmi:kubevirt_vmi_pgmajfaults:rate5m > 5 " +
-			"or (vmi:kubevirt_vmi_swap_traffic_bytes:rate5m > 1048576)) " +
-			"and (vmi:kubevirt_vmi_memory_available_bytes:sum > 0)) " +
-			"* on(name, namespace) group_left(vm)" +
-			"label_replace(label_replace(kubevirt_vmi_info{phase='running'}, " +
-			"'vm', '$1', 'name', '(.+)'), 'name', '$1', 'vmi_pod', '(.+)'))",
+			"or (vmi:kubevirt_vmi_swap_traffic_bytes:rate5m > 1048576)) and (vmi:kubevirt_vmi_memory_available_bytes:sum > 0)) " +
+			"* on(name, namespace) group_left(vm) " +
+			"topk by(name, namespace) (1, " +
+			"label_replace(label_replace(kubevirt_vmi_info{phase='running'}, 'vm', '$1', 'name', '(.+)'), 'name', '$1', 'vmi_pod', '(.+)')" +
+			"))",
 		),
 		For: ptr.To(promv1.Duration("5m")),
 		Annotations: map[string]string{
@@ -219,8 +274,9 @@ var vmiMemoryAlerts = []promv1.Rule{
 				"and (vmi:kubevirt_vmi_pgmajfaults:rate30m < 1) " +
 				"and (vmi:kubevirt_vmi_memory_available_bytes:sum > 0)) " +
 				"* on(name, namespace) group_left(vm) " +
-				"label_replace(label_replace(kubevirt_vmi_info{phase='running'}, " +
-				"'vm', '$1', 'name', '(.+)'), 'name', '$1', 'vmi_pod', '(.+)'))",
+				"topk by(name, namespace) (1, " +
+				"label_replace(label_replace(kubevirt_vmi_info{phase='running'}, 'vm', '$1', 'name', '(.+)'), 'name', '$1', 'vmi_pod', '(.+)'))" +
+				")",
 		),
 		For: ptr.To(promv1.Duration("30m")),
 		Annotations: map[string]string{
@@ -238,13 +294,8 @@ var vmiMemoryAlerts = []promv1.Rule{
 var guestFilesystemAlerts = []promv1.Rule{
 	{
 		Alert: "GuestFilesystemAlmostOutOfSpace",
-		Expr: intstr.FromString(fmt.Sprintf(
-			"(kubevirt_vmi_filesystem_used_bytes{file_system_type!~'%s',mount_point!='System Reserved'} / "+
-				"kubevirt_vmi_filesystem_capacity_bytes{file_system_type!~'%s',"+
-				"mount_point!='System Reserved'})*100 >= 85 < 95",
-			excludedFilesystemTypesRegex, excludedFilesystemTypesRegex,
-		)),
-		For: ptr.To(promv1.Duration("10m")),
+		Expr:  intstr.FromString(withVMLabel(guestFilesystemUsagePercentExpr + " >= 85 < 95")),
+		For:   ptr.To(promv1.Duration("10m")),
 		Annotations: map[string]string{
 			summaryAnnotationKey: "Guest filesystem is running out of space",
 			descriptionAnnotationKey: "VirtualMachineInstance {{ $labels.name }} in namespace {{ $labels.namespace }} " +
@@ -257,12 +308,7 @@ var guestFilesystemAlerts = []promv1.Rule{
 	},
 	{
 		Alert: "GuestFilesystemAlmostOutOfSpace",
-		Expr: intstr.FromString(fmt.Sprintf(
-			"(kubevirt_vmi_filesystem_used_bytes{file_system_type!~'%s',mount_point!='System Reserved'} / "+
-				"kubevirt_vmi_filesystem_capacity_bytes{file_system_type!~'%s',"+
-				"mount_point!='System Reserved'})*100 >= 95",
-			excludedFilesystemTypesRegex, excludedFilesystemTypesRegex,
-		)),
+		Expr:  intstr.FromString(withVMLabel(guestFilesystemUsagePercentExpr + " >= 95")),
 		Annotations: map[string]string{
 			summaryAnnotationKey: "Guest filesystem is critically low on space",
 			descriptionAnnotationKey: "VirtualMachineInstance {{ $labels.name }} in namespace {{ $labels.namespace }} " +
@@ -278,7 +324,7 @@ var guestFilesystemAlerts = []promv1.Rule{
 var vmiHotplugAlerts = []promv1.Rule{
 	{
 		Alert: "VirtualMachineInstanceHasEphemeralHotplugVolume",
-		Expr:  intstr.FromString("kubevirt_vmi_contains_ephemeral_hotplug_volume == 1"),
+		Expr:  intstr.FromString(withVMLabel("kubevirt_vmi_contains_ephemeral_hotplug_volume == 1")),
 		Annotations: map[string]string{
 			summaryAnnotationKey: "Virtual Machine Instance has Ephemeral Hotplug Volume(s). " +
 				"Ephemeral Hotplugs are deprecated and must be converted to persistent volumes! " +
@@ -298,7 +344,7 @@ var vmiHotplugAlerts = []promv1.Rule{
 var guestDriverAlerts = []promv1.Rule{
 	{
 		Alert: "OutdatedGuestDeviceDrivers",
-		Expr:  intstr.FromString("vmi:kubevirt_vmi_guest_device_driver_timestamp_seconds:max{namespace!=''}"),
+		Expr:  intstr.FromString(withVMLabel("vmi:kubevirt_vmi_guest_device_driver_timestamp_seconds:max{namespace!=''}")),
 		For:   ptr.To(promv1.Duration("1h")),
 		Annotations: map[string]string{
 			summaryAnnotationKey: "A guest device driver is outdated: its installed version is not the latest " +
@@ -317,12 +363,12 @@ var guestDriverAlerts = []promv1.Rule{
 var vmiInterfaceAlerts = []promv1.Rule{
 	{
 		Alert: "KubeVirtVMIOrdinalPodInterfaceName",
-		Expr: intstr.FromString(
+		Expr: intstr.FromString(withVMLabel(
 			"count by (namespace, name) (" +
 				"kubevirt_vmi_vnic_info{pod_interface_name=~'net[0-9]+'}" +
 				") and on (namespace, name) " +
 				"kubevirt_vmi_info{phase='running'}",
-		),
+		)),
 		For: ptr.To(promv1.Duration("5m")),
 		Annotations: map[string]string{
 			summaryAnnotationKey: "A VirtualMachineInstance uses the deprecated " +
