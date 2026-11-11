@@ -36,6 +36,53 @@ make deploy IMG=$IMG
 
 For detailed deployment options, configuration flags, and verification steps, see [docs/deployment.md](docs/deployment.md).
 
+## Selecting what to expose
+
+KubeVirt publishes most of these metrics, recording rules, and alerts itself.
+Running both without filtering double-publishes them.
+
+Selection works by **group**, a named bundle of metrics, recording rules, and
+alerts that belong together. Groups whose contents KubeVirt does not ship are
+enabled by default, so the default configuration adds observability without
+duplicating anything:
+
+| Group | What it adds |
+|-------|--------------|
+| `guest-drivers` | Guest device driver versions and staleness |
+| `guest-agent` | Guest hostname, timezone, logged-in user count |
+| `guest-os` | Guest operating system identity |
+| `inventory` | Snapshot, restore, export, clone, pool, and migration inventory |
+| `vmi-interfaces` | Guest network interfaces, ordinal naming deprecation |
+| `vmi-hotplug` | Ephemeral hotplug volume deprecation |
+
+The `virt-*` control plane rules, VM and VMI status metrics, and the libvirt
+domain stats that mirror KubeVirt are off by default. See
+[docs/metrics.md](docs/metrics.md#groups) for the full group listing.
+
+### Changing the selection
+
+```sh
+# defaults, minus two groups
+--metrics-allowlist=-guest-agent,-inventory
+
+# defaults, plus the memory recording rules
+--recording-rules-allowlist=+vmi-memory
+
+# exactly one group, nothing else
+--metrics-allowlist=guest-drivers
+
+# exactly one metric
+--metrics-allowlist=kubevirt_vmi_guest_device_driver_timestamp_seconds
+```
+
+Each entry is a group name or an individual item name. A bare list is
+absolute. Prefixing every entry with `+` or `-` adjusts the default set. The
+two forms cannot be mixed. `all` and `none` select everything or nothing.
+Unknown names are rejected at startup rather than silently ignored.
+
+To replace KubeVirt's own monitoring rather than supplement it, pass `all` to
+all three flags.
+
 ## Documentation
 
 - [Deployment Guide](docs/deployment.md) — build, deploy, configure, and verify

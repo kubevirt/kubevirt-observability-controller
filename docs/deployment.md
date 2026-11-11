@@ -61,9 +61,9 @@ The controller accepts the following flags (set via the Deployment's `args`):
 | `--tls-security-profile` | `""` | TLS security profile for the metrics server: `Old`, `Intermediate`, `Modern`, or `Custom` |
 | `--tls-min-version` | `""` | Minimum TLS version (e.g., `VersionTLS12`). Only valid with `--tls-security-profile=Custom` |
 | `--tls-ciphers` | `""` | Comma-separated OpenSSL cipher names. Only valid with `--tls-security-profile=Custom` |
-| `--metrics-allowlist` | `""` | Comma-separated list of metrics to expose (empty = all) |
-| `--alerts-allowlist` | `""` | Comma-separated list of alerts to include in the PrometheusRule (empty = all) |
-| `--recording-rules-allowlist` | `""` | Comma-separated list of recording rules to include (empty = all) |
+| `--metrics-allowlist` | `""` | Groups or metric names to expose (see [Selecting what to expose](#selecting-what-to-expose)) |
+| `--alerts-allowlist` | `""` | Groups or alert names to include in the PrometheusRule |
+| `--recording-rules-allowlist` | `""` | Groups or recording rule names to include in the PrometheusRule |
 | `--enable-vmstats` | `false` | Enable the vmstats poller for domain-level VM metrics |
 | `--vmstats-port` | `8187` | Port for the virt-handler vmstats endpoint |
 | `--vmstats-cert-path` | `""` | Directory containing the vmstats client certificate |
@@ -72,6 +72,47 @@ The controller accepts the following flags (set via the Deployment's `args`):
 | `--webhook-cert-path` | `""` | Directory containing the webhook certificate |
 
 The default kustomize overlay sets `--metrics-bind-address=:8443` via `config/default/manager_metrics_patch.yaml`.
+
+### Selecting what to expose
+
+Metrics, recording rules, and alerts are organised into **groups**. A group is
+a named bundle of items that belong together, metrics, the recording rules
+built on it, and the alerts that fire on those metrics/rules.
+
+Groups whose contents KubeVirt does not publish itself are enabled by default,
+so the zero-flag configuration never double-publishes a series. Every other
+group is off. `docs/metrics.md` lists each group, its default, and the items
+in it.
+
+The three allowlist flags share one grammar:
+
+| Value | Meaning |
+|-------|---------|
+| `""` (default) | The groups KubeVirt does not publish |
+| `all` | Every group |
+| `none` | Nothing |
+| `a,b` | Exactly the contents of `a` and `b` |
+| `+a,-b` | The default set, plus `a`, minus `b` |
+
+Each entry is either a group name or an individual item name, so
+`--metrics-allowlist=guest-drivers` and
+`--metrics-allowlist=kubevirt_vmi_guest_device_driver_timestamp_seconds` are
+both valid. Absolute and relative forms cannot be mixed in one value, and an
+entry that names neither a known group nor a known item of that type stops
+the controller at startup.
+
+Resolution is logged once on startup:
+
+```
+groups enabled  guest-agent, guest-os, guest-drivers, vmi-interfaces, vmi-hotplug, inventory
+selection resolved  metrics=23 recordingRules=1 alerts=3
+```
+
+#### Replacing KubeVirt's monitoring
+
+To use this controller instead of KubeVirt's own monitoring rather than
+alongside it, pass `all` to all three flags and disable the corresponding
+rules in KubeVirt.
 
 ### VMStats feature gate
 
