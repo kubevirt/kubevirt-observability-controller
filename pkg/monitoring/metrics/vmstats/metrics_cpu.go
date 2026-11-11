@@ -18,7 +18,11 @@ Copyright The KubeVirt Authors.
 
 package vmstats
 
-import "github.com/rhobs/operator-observability-toolkit/pkg/operatormetrics"
+import (
+	"github.com/rhobs/operator-observability-toolkit/pkg/operatormetrics"
+
+	"github.com/kubevirt/kubevirt-observability-controller/pkg/monitoring/groups"
+)
 
 var (
 	cpuMetricsList = []operatormetrics.Metric{
@@ -27,28 +31,34 @@ var (
 	}
 
 	cpuUsageSeconds = operatormetrics.NewCounter(operatormetrics.MetricOpts{
-		Name: "kubevirt_vmi_cpu_usage_seconds_total",
-		Help: "Total CPU time spent in all modes (sum of both vcpu and hypervisor usage).",
+		Name:        "kubevirt_vmi_cpu_usage_seconds_total",
+		ExtraFields: groups.Tag(groups.VMICPU),
+		Help:        "Total CPU time spent in all modes (sum of both vcpu and hypervisor usage).",
 	})
 	cpuUserUsageSeconds = operatormetrics.NewCounter(operatormetrics.MetricOpts{
-		Name: "kubevirt_vmi_cpu_user_usage_seconds_total",
-		Help: "Total CPU time spent in user mode.",
+		Name:        "kubevirt_vmi_cpu_user_usage_seconds_total",
+		ExtraFields: groups.Tag(groups.VMICPU),
+		Help:        "Total CPU time spent in user mode.",
 	})
 	cpuSystemUsageSeconds = operatormetrics.NewCounter(operatormetrics.MetricOpts{
-		Name: "kubevirt_vmi_cpu_system_usage_seconds_total",
-		Help: "Total CPU time spent in system mode.",
+		Name:        "kubevirt_vmi_cpu_system_usage_seconds_total",
+		ExtraFields: groups.Tag(groups.VMICPU),
+		Help:        "Total CPU time spent in system mode.",
 	})
 	guestLoad1m = operatormetrics.NewGauge(operatormetrics.MetricOpts{
-		Name: "kubevirt_vmi_guest_load_1m",
-		Help: "Guest system load average over 1 minute.",
+		Name:        "kubevirt_vmi_guest_load_1m",
+		ExtraFields: groups.Tag(groups.VMICPU),
+		Help:        "Guest system load average over 1 minute.",
 	})
 	guestLoad5m = operatormetrics.NewGauge(operatormetrics.MetricOpts{
-		Name: "kubevirt_vmi_guest_load_5m",
-		Help: "Guest system load average over 5 minutes.",
+		Name:        "kubevirt_vmi_guest_load_5m",
+		ExtraFields: groups.Tag(groups.VMICPU),
+		Help:        "Guest system load average over 5 minutes.",
 	})
 	guestLoad15m = operatormetrics.NewGauge(operatormetrics.MetricOpts{
-		Name: "kubevirt_vmi_guest_load_15m",
-		Help: "Guest system load average over 15 minutes.",
+		Name:        "kubevirt_vmi_guest_load_15m",
+		ExtraFields: groups.Tag(groups.VMICPU),
+		Help:        "Guest system load average over 15 minutes.",
 	})
 )
 

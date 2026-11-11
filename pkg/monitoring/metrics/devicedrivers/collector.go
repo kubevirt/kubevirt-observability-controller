@@ -22,13 +22,15 @@ import (
 	"github.com/rhobs/operator-observability-toolkit/pkg/operatormetrics"
 	ctrlmetrics "sigs.k8s.io/controller-runtime/pkg/metrics"
 
+	"github.com/kubevirt/kubevirt-observability-controller/pkg/monitoring/groups"
 	"github.com/kubevirt/kubevirt-observability-controller/pkg/monitoring/metrics"
 )
 
 var (
 	latestVersionInfo = operatormetrics.NewGaugeVec(
 		operatormetrics.MetricOpts{
-			Name: "kubevirt_guest_device_driver_latest_version_info",
+			Name:        "kubevirt_guest_device_driver_latest_version_info",
+			ExtraFields: groups.Tag(groups.GuestDrivers),
 			Help: "Latest available guest device driver version for a device and " +
 				"guest OS version, as declared in the guest device drivers ConfigMap.",
 		},
@@ -37,7 +39,8 @@ var (
 
 	configInvalid = operatormetrics.NewGauge(
 		operatormetrics.MetricOpts{
-			Name: "kubevirt_guest_device_driver_config_invalid",
+			Name:        "kubevirt_guest_device_driver_config_invalid",
+			ExtraFields: groups.Tag(groups.GuestDrivers),
 			Help: "1 while the guest device drivers ConfigMap present in the cluster is " +
 				"rejected and the last valid versions are kept, 0 otherwise.",
 		},
@@ -62,9 +65,15 @@ func RegisterCollector(cache *DriversCache, allowlist map[string]bool) error {
 	return operatormetrics.RegisterCollector(*filtered)
 }
 
+// AllMetrics returns every guest device driver metric before filtering, so the
+// selection layer can read group membership without registering the collector.
+func AllMetrics() []operatormetrics.Metric {
+	return []operatormetrics.Metric{latestVersionInfo, configInvalid}
+}
+
 func driversCollector(cache *DriversCache) operatormetrics.Collector {
 	return operatormetrics.Collector{
-		Metrics: []operatormetrics.Metric{latestVersionInfo, configInvalid},
+		Metrics: AllMetrics(),
 		CollectCallback: func() []operatormetrics.CollectorResult {
 			entries := cache.List()
 

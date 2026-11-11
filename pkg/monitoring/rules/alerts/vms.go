@@ -30,7 +30,7 @@ const excludedFilesystemTypesRegex = "CDFS|iso9660|udf|squashfs|cramfs|tmpfs|dev
 	"sysfs|selinuxfs|securityfs|pstore|debugfs|tracefs|configfs|binfmt_misc|bpf|devpts|" +
 	"mqueue|nsfs|rpc_pipefs|ramfs|rootfs|overlay|cgroup.*|fuse\\\\..*|fusectl"
 
-var vmsAlerts = []promv1.Rule{
+var vmiStatusAlerts = []promv1.Rule{
 	{
 		Alert: "VirtLauncherPodsStuckFailed",
 		Expr: intstr.FromString(
@@ -84,23 +84,6 @@ var vmsAlerts = []promv1.Rule{
 		},
 	},
 	{
-		Alert: "KubeVirtVMIExcessiveMigrations",
-		Expr: intstr.FromString(
-			"sum by (vmi, namespace) (topk by (vmi, namespace, vmim) " +
-				"(1, max_over_time(kubevirt_vmi_migration_succeeded[1d]))) >= 12",
-		),
-		Annotations: map[string]string{
-			descriptionAnnotationKey: "VirtualMachineInstance {{ $labels.vmi }} in namespace " +
-				"{{ $labels.namespace }} has been migrated more than 12 times during the last 24 hours",
-			summaryAnnotationKey: "An excessive amount of migrations have been detected on " +
-				"a VirtualMachineInstance in the last 24 hours.",
-		},
-		Labels: map[string]string{
-			severityAlertLabelKey:        "warning",
-			operatorHealthImpactLabelKey: "none",
-		},
-	},
-	{
 		Alert: "OutdatedVirtualMachineInstanceWorkloads",
 		Expr:  intstr.FromString("kubevirt_vmi_number_of_outdated != 0"),
 		For:   ptr.To(promv1.Duration("24h")),
@@ -113,30 +96,9 @@ var vmsAlerts = []promv1.Rule{
 			operatorHealthImpactLabelKey: "none",
 		},
 	},
-	{
-		Alert: "GuestVCPUQueueHighWarning",
-		Expr:  intstr.FromString("vmi:kubevirt_vmi_guest_queue_length:sum > 10"),
-		Annotations: map[string]string{
-			descriptionAnnotationKey: "VirtualMachineInstance {{ $labels.name }} CPU queue length > 10",
-			summaryAnnotationKey:     "Guest vCPU Queue within collection cycle > 10",
-		},
-		Labels: map[string]string{
-			severityAlertLabelKey:        "warning",
-			operatorHealthImpactLabelKey: "none",
-		},
-	},
-	{
-		Alert: "GuestVCPUQueueHighCritical",
-		Expr:  intstr.FromString("vmi:kubevirt_vmi_guest_queue_length:sum > 20"),
-		Annotations: map[string]string{
-			descriptionAnnotationKey: "VirtualMachineInstance {{ $labels.name }} CPU queue length > 20",
-			summaryAnnotationKey:     "Guest vCPU Queue within collection cycle > 20",
-		},
-		Labels: map[string]string{
-			severityAlertLabelKey:        "critical",
-			operatorHealthImpactLabelKey: "none",
-		},
-	},
+}
+
+var vmStatusAlerts = []promv1.Rule{
 	{
 		Alert: "VirtualMachineStuckInUnhealthyState",
 		Expr: intstr.FromString(
@@ -177,6 +139,56 @@ var vmsAlerts = []promv1.Rule{
 			operatorHealthImpactLabelKey: "none",
 		},
 	},
+}
+
+var vmiMigrationAlerts = []promv1.Rule{
+	{
+		Alert: "KubeVirtVMIExcessiveMigrations",
+		Expr: intstr.FromString(
+			"sum by (vmi, namespace) (topk by (vmi, namespace, vmim) " +
+				"(1, max_over_time(kubevirt_vmi_migration_succeeded[1d]))) >= 12",
+		),
+		Annotations: map[string]string{
+			descriptionAnnotationKey: "VirtualMachineInstance {{ $labels.vmi }} in namespace " +
+				"{{ $labels.namespace }} has been migrated more than 12 times during the last 24 hours",
+			summaryAnnotationKey: "An excessive amount of migrations have been detected on " +
+				"a VirtualMachineInstance in the last 24 hours.",
+		},
+		Labels: map[string]string{
+			severityAlertLabelKey:        "warning",
+			operatorHealthImpactLabelKey: "none",
+		},
+	},
+}
+
+var vmiCPUAlerts = []promv1.Rule{
+	{
+		Alert: "GuestVCPUQueueHighWarning",
+		Expr:  intstr.FromString("vmi:kubevirt_vmi_guest_queue_length:sum > 10"),
+		Annotations: map[string]string{
+			descriptionAnnotationKey: "VirtualMachineInstance {{ $labels.name }} CPU queue length > 10",
+			summaryAnnotationKey:     "Guest vCPU Queue within collection cycle > 10",
+		},
+		Labels: map[string]string{
+			severityAlertLabelKey:        "warning",
+			operatorHealthImpactLabelKey: "none",
+		},
+	},
+	{
+		Alert: "GuestVCPUQueueHighCritical",
+		Expr:  intstr.FromString("vmi:kubevirt_vmi_guest_queue_length:sum > 20"),
+		Annotations: map[string]string{
+			descriptionAnnotationKey: "VirtualMachineInstance {{ $labels.name }} CPU queue length > 20",
+			summaryAnnotationKey:     "Guest vCPU Queue within collection cycle > 20",
+		},
+		Labels: map[string]string{
+			severityAlertLabelKey:        "critical",
+			operatorHealthImpactLabelKey: "none",
+		},
+	},
+}
+
+var vmiMemoryAlerts = []promv1.Rule{
 	{
 		Alert: "KubeVirtVMGuestMemoryPressure",
 		Expr: intstr.FromString("((" +
@@ -198,6 +210,32 @@ var vmsAlerts = []promv1.Rule{
 			operatorHealthImpactLabelKey: "none",
 		},
 	},
+	{
+		Alert: "KubeVirtVMGuestMemoryAvailableLow",
+		Expr: intstr.FromString(
+			"((" +
+				"(vmi:kubevirt_vmi_memory_headroom_ratio:sum < 0.03) " +
+				"and (vmi:kubevirt_vmi_swap_traffic_bytes:rate30m < 2048) " +
+				"and (vmi:kubevirt_vmi_pgmajfaults:rate30m < 1) " +
+				"and (vmi:kubevirt_vmi_memory_available_bytes:sum > 0)) " +
+				"* on(name, namespace) group_left(vm) " +
+				"label_replace(label_replace(kubevirt_vmi_info{phase='running'}, " +
+				"'vm', '$1', 'name', '(.+)'), 'name', '$1', 'vmi_pod', '(.+)'))",
+		),
+		For: ptr.To(promv1.Duration("30m")),
+		Annotations: map[string]string{
+			descriptionAnnotationKey: "VirtualMachine {{ $labels.vm }} in namespace {{ $labels.namespace }} " +
+				"has very low available memory (<3% headroom) for 30 minutes with no meaningful swap IO (likely no swap).",
+			summaryAnnotationKey: "The VirtualMachine has low available memory without swap",
+		},
+		Labels: map[string]string{
+			severityAlertLabelKey:        "info",
+			operatorHealthImpactLabelKey: "none",
+		},
+	},
+}
+
+var guestFilesystemAlerts = []promv1.Rule{
 	{
 		Alert: "GuestFilesystemAlmostOutOfSpace",
 		Expr: intstr.FromString(fmt.Sprintf(
@@ -235,6 +273,9 @@ var vmsAlerts = []promv1.Rule{
 			operatorHealthImpactLabelKey: "none",
 		},
 	},
+}
+
+var vmiHotplugAlerts = []promv1.Rule{
 	{
 		Alert: "VirtualMachineInstanceHasEphemeralHotplugVolume",
 		Expr:  intstr.FromString("kubevirt_vmi_contains_ephemeral_hotplug_volume == 1"),
@@ -252,29 +293,9 @@ var vmsAlerts = []promv1.Rule{
 			operatorHealthImpactLabelKey: "none",
 		},
 	},
-	{
-		Alert: "KubeVirtVMGuestMemoryAvailableLow",
-		Expr: intstr.FromString(
-			"((" +
-				"(vmi:kubevirt_vmi_memory_headroom_ratio:sum < 0.03) " +
-				"and (vmi:kubevirt_vmi_swap_traffic_bytes:rate30m < 2048) " +
-				"and (vmi:kubevirt_vmi_pgmajfaults:rate30m < 1) " +
-				"and (vmi:kubevirt_vmi_memory_available_bytes:sum > 0)) " +
-				"* on(name, namespace) group_left(vm) " +
-				"label_replace(label_replace(kubevirt_vmi_info{phase='running'}, " +
-				"'vm', '$1', 'name', '(.+)'), 'name', '$1', 'vmi_pod', '(.+)'))",
-		),
-		For: ptr.To(promv1.Duration("30m")),
-		Annotations: map[string]string{
-			descriptionAnnotationKey: "VirtualMachine {{ $labels.vm }} in namespace {{ $labels.namespace }} " +
-				"has very low available memory (<3% headroom) for 30 minutes with no meaningful swap IO (likely no swap).",
-			summaryAnnotationKey: "The VirtualMachine has low available memory without swap",
-		},
-		Labels: map[string]string{
-			severityAlertLabelKey:        "info",
-			operatorHealthImpactLabelKey: "none",
-		},
-	},
+}
+
+var guestDriverAlerts = []promv1.Rule{
 	{
 		Alert: "OutdatedGuestDeviceDrivers",
 		Expr:  intstr.FromString("vmi:kubevirt_vmi_guest_device_driver_timestamp_seconds:max{namespace!=''}"),
@@ -291,6 +312,9 @@ var vmsAlerts = []promv1.Rule{
 			operatorHealthImpactLabelKey: "none",
 		},
 	},
+}
+
+var vmiInterfaceAlerts = []promv1.Rule{
 	{
 		Alert: "KubeVirtVMIOrdinalPodInterfaceName",
 		Expr: intstr.FromString(

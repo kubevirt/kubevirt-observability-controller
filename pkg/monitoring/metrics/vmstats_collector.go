@@ -28,6 +28,8 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/types"
 
+	"github.com/kubevirt/kubevirt-observability-controller/pkg/monitoring/groups"
+
 	k6tv1 "kubevirt.io/api/core/v1"
 	instancetypeapi "kubevirt.io/api/instancetype"
 )
@@ -53,64 +55,72 @@ var (
 
 	startingTimestamp = operatormetrics.NewCounterVec(
 		operatormetrics.MetricOpts{
-			Name: "kubevirt_vm_starting_status_last_transition_timestamp_seconds",
-			Help: "Virtual Machine last transition timestamp to starting status.",
+			Name:        "kubevirt_vm_starting_status_last_transition_timestamp_seconds",
+			ExtraFields: groups.Tag(groups.VMStatus),
+			Help:        "Virtual Machine last transition timestamp to starting status.",
 		},
 		vmLabelsSlice,
 	)
 
 	runningTimestamp = operatormetrics.NewCounterVec(
 		operatormetrics.MetricOpts{
-			Name: "kubevirt_vm_running_status_last_transition_timestamp_seconds",
-			Help: "Virtual Machine last transition timestamp to running status.",
+			Name:        "kubevirt_vm_running_status_last_transition_timestamp_seconds",
+			ExtraFields: groups.Tag(groups.VMStatus),
+			Help:        "Virtual Machine last transition timestamp to running status.",
 		},
 		vmLabelsSlice,
 	)
 
 	migratingTimestamp = operatormetrics.NewCounterVec(
 		operatormetrics.MetricOpts{
-			Name: "kubevirt_vm_migrating_status_last_transition_timestamp_seconds",
-			Help: "Virtual Machine last transition timestamp to migrating status.",
+			Name:        "kubevirt_vm_migrating_status_last_transition_timestamp_seconds",
+			ExtraFields: groups.Tag(groups.VMStatus),
+			Help:        "Virtual Machine last transition timestamp to migrating status.",
 		},
 		vmLabelsSlice,
 	)
 
 	nonRunningTimestamp = operatormetrics.NewCounterVec(
 		operatormetrics.MetricOpts{
-			Name: "kubevirt_vm_non_running_status_last_transition_timestamp_seconds",
-			Help: "Virtual Machine last transition timestamp to paused/stopped status.",
+			Name:        "kubevirt_vm_non_running_status_last_transition_timestamp_seconds",
+			ExtraFields: groups.Tag(groups.VMStatus),
+			Help:        "Virtual Machine last transition timestamp to paused/stopped status.",
 		},
 		vmLabelsSlice,
 	)
 
 	errorTimestamp = operatormetrics.NewCounterVec(
 		operatormetrics.MetricOpts{
-			Name: "kubevirt_vm_error_status_last_transition_timestamp_seconds",
-			Help: "Virtual Machine last transition timestamp to error status.",
+			Name:        "kubevirt_vm_error_status_last_transition_timestamp_seconds",
+			ExtraFields: groups.Tag(groups.VMStatus),
+			Help:        "Virtual Machine last transition timestamp to error status.",
 		},
 		vmLabelsSlice,
 	)
 
 	vmResourceRequests = operatormetrics.NewGaugeVec(
 		operatormetrics.MetricOpts{
-			Name: "kubevirt_vm_resource_requests",
-			Help: "Resources requested by Virtual Machine.",
+			Name:        "kubevirt_vm_resource_requests",
+			ExtraFields: groups.Tag(groups.VMStatus),
+			Help:        "Resources requested by Virtual Machine.",
 		},
 		[]string{"name", "namespace", "resource", "unit", "source"},
 	)
 
 	vmResourceLimits = operatormetrics.NewGaugeVec(
 		operatormetrics.MetricOpts{
-			Name: "kubevirt_vm_resource_limits",
-			Help: "Resource limits set for a Virtual Machine.",
+			Name:        "kubevirt_vm_resource_limits",
+			ExtraFields: groups.Tag(groups.VMStatus),
+			Help:        "Resource limits set for a Virtual Machine.",
 		},
 		[]string{"name", "namespace", "resource", "unit"},
 	)
 
 	vmInfo = operatormetrics.NewGaugeVec(
 		operatormetrics.MetricOpts{
-			Name: "kubevirt_vm_info",
-			Help: "Information about Virtual Machines.",
+			Name:        "kubevirt_vm_info",
+			ExtraFields: groups.Tag(groups.VMStatus),
+			Help:        "Information about Virtual Machines.",
 		},
 		[]string{
 			"name", "namespace",
@@ -123,24 +133,27 @@ var (
 
 	vmDiskAllocatedSize = operatormetrics.NewGaugeVec(
 		operatormetrics.MetricOpts{
-			Name: "kubevirt_vm_disk_allocated_size_bytes",
-			Help: "Allocated disk size of a Virtual Machine in bytes.",
+			Name:        "kubevirt_vm_disk_allocated_size_bytes",
+			ExtraFields: groups.Tag(groups.VMStatus),
+			Help:        "Allocated disk size of a Virtual Machine in bytes.",
 		},
 		[]string{"name", "namespace", "persistentvolumeclaim", "volume_mode", "device"},
 	)
 
 	vmCreationTimestamp = operatormetrics.NewGaugeVec(
 		operatormetrics.MetricOpts{
-			Name: "kubevirt_vm_create_date_timestamp_seconds",
-			Help: "Virtual Machine creation timestamp.",
+			Name:        "kubevirt_vm_create_date_timestamp_seconds",
+			ExtraFields: groups.Tag(groups.VMStatus),
+			Help:        "Virtual Machine creation timestamp.",
 		},
 		vmLabelsSlice,
 	)
 
 	vmVnicInfo = operatormetrics.NewGaugeVec(
 		operatormetrics.MetricOpts{
-			Name: "kubevirt_vm_vnic_info",
-			Help: "Details of Virtual Machine vNIC interfaces.",
+			Name:        "kubevirt_vm_vnic_info",
+			ExtraFields: groups.Tag(groups.VMStatus),
+			Help:        "Details of Virtual Machine vNIC interfaces.",
 		},
 		[]string{
 			"name", "namespace", "vnic_name",
@@ -150,8 +163,9 @@ var (
 
 	vmLabels = operatormetrics.NewGaugeVec(
 		operatormetrics.MetricOpts{
-			Name: "kubevirt_vm_labels",
-			Help: "The metric exposes the VM labels as Prometheus labels.",
+			Name:        "kubevirt_vm_labels",
+			ExtraFields: groups.Tag(groups.VMStatus),
+			Help:        "The metric exposes the VM labels as Prometheus labels.",
 		},
 		vmLabelsSlice,
 	)

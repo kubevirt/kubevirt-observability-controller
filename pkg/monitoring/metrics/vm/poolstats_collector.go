@@ -26,6 +26,7 @@ import (
 	"k8s.io/client-go/tools/cache"
 	poolv1 "kubevirt.io/api/pool/v1beta1"
 
+	"github.com/kubevirt/kubevirt-observability-controller/pkg/monitoring/groups"
 	"github.com/kubevirt/kubevirt-observability-controller/pkg/monitoring/metrics/internal/inventory"
 )
 
@@ -46,15 +47,17 @@ func NewVMPoolStatsCollector(getStore func() cache.Store) operatormetrics.Collec
 var (
 	vmPoolInfo = operatormetrics.NewGaugeVec(
 		operatormetrics.MetricOpts{
-			Name: "kubevirt_vmpool_info",
-			Help: "Information about VirtualMachinePools.",
+			Name:        "kubevirt_vmpool_info",
+			ExtraFields: groups.Tag(groups.Inventory),
+			Help:        "Information about VirtualMachinePools.",
 		},
 		[]string{"namespace", "name", "uid"},
 	)
 
 	vmPoolDesiredReplicas = operatormetrics.NewGaugeVec(
 		operatormetrics.MetricOpts{
-			Name: "kubevirt_vmpool_desired_replicas",
+			Name:        "kubevirt_vmpool_desired_replicas",
+			ExtraFields: groups.Tag(groups.Inventory),
 			Help: "Desired number of VirtualMachine replicas in a VirtualMachinePool " +
 				"(spec.replicas, default 1).",
 		},
@@ -63,7 +66,8 @@ var (
 
 	vmPoolReplicas = operatormetrics.NewGaugeVec(
 		operatormetrics.MetricOpts{
-			Name: "kubevirt_vmpool_replicas",
+			Name:        "kubevirt_vmpool_replicas",
+			ExtraFields: groups.Tag(groups.Inventory),
 			Help: "Current number of VirtualMachine replicas in a VirtualMachinePool " +
 				"(status.replicas).",
 		},
@@ -72,7 +76,8 @@ var (
 
 	vmPoolReadyReplicas = operatormetrics.NewGaugeVec(
 		operatormetrics.MetricOpts{
-			Name: "kubevirt_vmpool_ready_replicas",
+			Name:        "kubevirt_vmpool_ready_replicas",
+			ExtraFields: groups.Tag(groups.Inventory),
 			Help: "Number of ready VirtualMachine replicas in a VirtualMachinePool " +
 				"(status.readyReplicas).",
 		},
@@ -81,7 +86,8 @@ var (
 
 	vmPoolPaused = operatormetrics.NewGaugeVec(
 		operatormetrics.MetricOpts{
-			Name: "kubevirt_vmpool_paused",
+			Name:        "kubevirt_vmpool_paused",
+			ExtraFields: groups.Tag(groups.Inventory),
 			Help: "Whether a VirtualMachinePool is paused (spec.paused). 1 if paused, " +
 				"0 otherwise.",
 		},
@@ -90,7 +96,8 @@ var (
 
 	vmPoolReplicaFailure = operatormetrics.NewGaugeVec(
 		operatormetrics.MetricOpts{
-			Name: "kubevirt_vmpool_replica_failure",
+			Name:        "kubevirt_vmpool_replica_failure",
+			ExtraFields: groups.Tag(groups.Inventory),
 			Help: "Whether a VirtualMachinePool has a ReplicaFailure condition set to " +
 				"True. 1 if failing, 0 otherwise.",
 		},

@@ -18,8 +18,13 @@ Copyright The KubeVirt Authors.
 
 package vmstats
 
-import "github.com/rhobs/operator-observability-toolkit/pkg/operatormetrics"
+import (
+	"github.com/rhobs/operator-observability-toolkit/pkg/operatormetrics"
 
+	"github.com/kubevirt/kubevirt-observability-controller/pkg/monitoring/groups"
+)
+
+//nolint:dupl // parallel counter declarations, not shared logic
 var (
 	networkMetricsList = []operatormetrics.Metric{
 		networkReceiveBytes, networkTransmitBytes,
@@ -29,36 +34,44 @@ var (
 	}
 
 	networkReceiveBytes = operatormetrics.NewCounter(operatormetrics.MetricOpts{
-		Name: "kubevirt_vmi_network_receive_bytes_total",
-		Help: "Total network traffic received in bytes.",
+		Name:        "kubevirt_vmi_network_receive_bytes_total",
+		ExtraFields: groups.Tag(groups.VMINetwork),
+		Help:        "Total network traffic received in bytes.",
 	})
 	networkTransmitBytes = operatormetrics.NewCounter(operatormetrics.MetricOpts{
-		Name: "kubevirt_vmi_network_transmit_bytes_total",
-		Help: "Total network traffic transmitted in bytes.",
+		Name:        "kubevirt_vmi_network_transmit_bytes_total",
+		ExtraFields: groups.Tag(groups.VMINetwork),
+		Help:        "Total network traffic transmitted in bytes.",
 	})
 	networkReceivePackets = operatormetrics.NewCounter(operatormetrics.MetricOpts{
-		Name: "kubevirt_vmi_network_receive_packets_total",
-		Help: "Total network traffic received packets.",
+		Name:        "kubevirt_vmi_network_receive_packets_total",
+		ExtraFields: groups.Tag(groups.VMINetwork),
+		Help:        "Total network traffic received packets.",
 	})
 	networkTransmitPackets = operatormetrics.NewCounter(operatormetrics.MetricOpts{
-		Name: "kubevirt_vmi_network_transmit_packets_total",
-		Help: "Total network traffic transmitted packets.",
+		Name:        "kubevirt_vmi_network_transmit_packets_total",
+		ExtraFields: groups.Tag(groups.VMINetwork),
+		Help:        "Total network traffic transmitted packets.",
 	})
 	networkReceiveErrors = operatormetrics.NewCounter(operatormetrics.MetricOpts{
-		Name: "kubevirt_vmi_network_receive_errors_total",
-		Help: "Total network received error packets.",
+		Name:        "kubevirt_vmi_network_receive_errors_total",
+		ExtraFields: groups.Tag(groups.VMINetwork),
+		Help:        "Total network received error packets.",
 	})
 	networkTransmitErrors = operatormetrics.NewCounter(operatormetrics.MetricOpts{
-		Name: "kubevirt_vmi_network_transmit_errors_total",
-		Help: "Total network transmitted error packets.",
+		Name:        "kubevirt_vmi_network_transmit_errors_total",
+		ExtraFields: groups.Tag(groups.VMINetwork),
+		Help:        "Total network transmitted error packets.",
 	})
 	networkReceivePacketsDropped = operatormetrics.NewCounter(operatormetrics.MetricOpts{
-		Name: "kubevirt_vmi_network_receive_packets_dropped_total",
-		Help: "The total number of rx packets dropped on vNIC interfaces.",
+		Name:        "kubevirt_vmi_network_receive_packets_dropped_total",
+		ExtraFields: groups.Tag(groups.VMINetwork),
+		Help:        "The total number of rx packets dropped on vNIC interfaces.",
 	})
 	networkTransmitPacketsDropped = operatormetrics.NewCounter(operatormetrics.MetricOpts{
-		Name: "kubevirt_vmi_network_transmit_packets_dropped_total",
-		Help: "The total number of tx packets dropped on vNIC interfaces.",
+		Name:        "kubevirt_vmi_network_transmit_packets_dropped_total",
+		ExtraFields: groups.Tag(groups.VMINetwork),
+		Help:        "The total number of tx packets dropped on vNIC interfaces.",
 	})
 )
 

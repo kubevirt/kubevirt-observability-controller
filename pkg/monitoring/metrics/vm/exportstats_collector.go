@@ -24,6 +24,7 @@ import (
 	k6tv1 "kubevirt.io/api/core/v1"
 	exportv1 "kubevirt.io/api/export/v1"
 
+	"github.com/kubevirt/kubevirt-observability-controller/pkg/monitoring/groups"
 	"github.com/kubevirt/kubevirt-observability-controller/pkg/monitoring/metrics/internal/inventory"
 )
 
@@ -38,15 +39,17 @@ func NewVMExportStatsCollector(getStore func() cache.Store) operatormetrics.Coll
 var (
 	vmExportInfo = operatormetrics.NewGaugeVec(
 		operatormetrics.MetricOpts{
-			Name: "kubevirt_vmexport_info",
-			Help: "Information about VirtualMachineExports.",
+			Name:        "kubevirt_vmexport_info",
+			ExtraFields: groups.Tag(groups.Inventory),
+			Help:        "Information about VirtualMachineExports.",
 		},
 		[]string{"namespace", "name", "uid", "vm", "source", "source_kind", "phase"},
 	)
 
 	vmExportTTLExpirationTimestamp = operatormetrics.NewGaugeVec(
 		operatormetrics.MetricOpts{
-			Name: "kubevirt_vmexport_ttl_expiration_timestamp_seconds",
+			Name:        "kubevirt_vmexport_ttl_expiration_timestamp_seconds",
+			ExtraFields: groups.Tag(groups.Inventory),
 			Help: "Time at which a VirtualMachineExport will be deleted according to " +
 				"its TTL (status.ttlExpirationTime).",
 		},

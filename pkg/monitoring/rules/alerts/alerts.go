@@ -21,11 +21,14 @@ package alerts
 import (
 	"errors"
 	"fmt"
+	"maps"
 	"os"
 	"strings"
 
 	promv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
 	"github.com/rhobs/operator-observability-toolkit/pkg/operatorrules"
+
+	"github.com/kubevirt/kubevirt-observability-controller/pkg/monitoring/groups"
 )
 
 const (
@@ -46,41 +49,77 @@ const (
 	fiveMinutes   = 5
 )
 
-func Register(registry *operatorrules.Registry, namespace string, allowlist map[string]bool) error {
-	componentAlerts := [][]promv1.Rule{
-		systemAlerts(namespace),
-		virtAPIAlerts(namespace),
-		virtControllerAlerts(namespace),
-		virtHandlerAlerts(namespace),
-		virtOperatorAlerts(namespace),
-	}
-
-	allAlerts := make([][]promv1.Rule, 0, len(componentAlerts)+1)
-	allAlerts = append(allAlerts, componentAlerts...)
-	allAlerts = append(allAlerts, vmsAlerts)
-
-	runbookURLTemplate := getRunbookURLTemplate()
-	for _, alertGroup := range allAlerts {
-		for i := range alertGroup {
-			alertGroup[i].Labels[partOfAlertLabelKey] = kubevirtLabelValue
-			alertGroup[i].Labels[componentAlertLabelKey] = kubevirtLabelValue
-			alertGroup[i].Annotations[prometheusRunbookAnnotationKey] = fmt.Sprintf(
-				runbookURLTemplate, alertGroup[i].Alert)
-		}
-	}
-
+// All returns every alert the controller defines, keyed by its group, with the
+// common labels and annotations applied.
+//
+// Each call returns freshly copied rules. Decorating the package-level slices
+// in place would leak one caller's namespace into the next, which matters now
+// that the selection layer builds its index from a separate call.
+func All(namespace string) map[groups.Name][]promv1.Rule {
 	// Component and system alerts operate in the KubeVirt install namespace.
 	// VM workload alerts derive namespace from their PromQL expression instead.
-	for _, alertGroup := range componentAlerts {
-		for i := range alertGroup {
-			alertGroup[i].Labels[namespaceAlertLabelKey] = namespace
+	component := map[groups.Name][]promv1.Rule{
+		groups.ClusterNodes:   systemAlerts(namespace),
+		groups.VirtAPI:        virtAPIAlerts(namespace),
+		groups.VirtController: virtControllerAlerts(namespace),
+		groups.VirtHandler:    virtHandlerAlerts(namespace),
+		groups.VirtOperator:   virtOperatorAlerts(namespace),
+	}
+	workload := map[groups.Name][]promv1.Rule{
+		groups.VMIStatus:       vmiStatusAlerts,
+		groups.VMStatus:        vmStatusAlerts,
+		groups.VMIMigration:    vmiMigrationAlerts,
+		groups.VMICPU:          vmiCPUAlerts,
+		groups.VMIMemory:       vmiMemoryAlerts,
+		groups.GuestFilesystem: guestFilesystemAlerts,
+		groups.VMIHotplug:      vmiHotplugAlerts,
+		groups.GuestDrivers:    guestDriverAlerts,
+		groups.VMIInterfaces:   vmiInterfaceAlerts,
+	}
+
+	runbookURLTemplate := getRunbookURLTemplate()
+	out := make(map[groups.Name][]promv1.Rule, len(component)+len(workload))
+
+	decorate := func(src map[groups.Name][]promv1.Rule, inNamespace bool) {
+		for g, rules := range src {
+			cp := make([]promv1.Rule, 0, len(rules))
+			for _, r := range rules {
+				r.Labels = maps.Clone(r.Labels)
+				r.Annotations = maps.Clone(r.Annotations)
+				r.Labels[partOfAlertLabelKey] = kubevirtLabelValue
+				r.Labels[componentAlertLabelKey] = kubevirtLabelValue
+				r.Annotations[prometheusRunbookAnnotationKey] = fmt.Sprintf(runbookURLTemplate, r.Alert)
+				if inNamespace {
+					r.Labels[namespaceAlertLabelKey] = namespace
+				}
+				cp = append(cp, r)
+			}
+			out[g] = cp
 		}
 	}
 
-	if allowlist != nil {
-		for i := range allAlerts {
-			allAlerts[i] = filterAlerts(allAlerts[i], allowlist)
+	decorate(component, true)
+	decorate(workload, false)
+
+	return out
+}
+
+func Register(registry *operatorrules.Registry, namespace string, allowlist map[string]bool) error {
+	all := All(namespace)
+
+	// Iterate groups.All rather than the map so registration order is
+	// deterministic. The registry happens to sort before rendering, so this
+	// does not affect the PrometheusRule, but it keeps failures reproducible.
+	allAlerts := make([][]promv1.Rule, 0, len(all))
+	for _, g := range groups.All {
+		rules, ok := all[g.Name]
+		if !ok {
+			continue
 		}
+		if allowlist != nil {
+			rules = filterAlerts(rules, allowlist)
+		}
+		allAlerts = append(allAlerts, rules)
 	}
 
 	return registry.RegisterAlerts(allAlerts...)

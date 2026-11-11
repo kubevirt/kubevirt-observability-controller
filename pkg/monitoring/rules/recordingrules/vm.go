@@ -22,12 +22,15 @@ import (
 	"github.com/rhobs/operator-observability-toolkit/pkg/operatormetrics"
 	"github.com/rhobs/operator-observability-toolkit/pkg/operatorrules"
 	"k8s.io/apimachinery/pkg/util/intstr"
+
+	"github.com/kubevirt/kubevirt-observability-controller/pkg/monitoring/groups"
 )
 
 var vmRecordingRules = []operatorrules.RecordingRule{
 	{
 		MetricsOpts: operatormetrics.MetricOpts{
-			Name: "pod_container:kubevirt_vm_memory_request_margin_based_on_working_set_bytes:sum",
+			Name:        "pod_container:kubevirt_vm_memory_request_margin_based_on_working_set_bytes:sum",
+			ExtraFields: groups.Tag(groups.VMStatus),
 			Help: "Difference between requested memory and working set for VM containers (request margin). " +
 				"Can be negative when usage exceeds request.",
 		},
@@ -41,7 +44,8 @@ var vmRecordingRules = []operatorrules.RecordingRule{
 	},
 	{
 		MetricsOpts: operatormetrics.MetricOpts{
-			Name: "pod_container:kubevirt_vm_memory_request_margin_based_on_rss_bytes:sum",
+			Name:        "pod_container:kubevirt_vm_memory_request_margin_based_on_rss_bytes:sum",
+			ExtraFields: groups.Tag(groups.VMStatus),
 			Help: "Difference between requested memory and rss for VM containers (request margin). " +
 				"Can be negative when usage exceeds request.",
 		},
@@ -54,8 +58,9 @@ var vmRecordingRules = []operatorrules.RecordingRule{
 	},
 	{
 		MetricsOpts: operatormetrics.MetricOpts{
-			Name: "namespace:kubevirt_vm:sum",
-			Help: "The number of VMs in the cluster by namespace.",
+			Name:        "namespace:kubevirt_vm:sum",
+			ExtraFields: groups.Tag(groups.VMStatus),
+			Help:        "The number of VMs in the cluster by namespace.",
 		},
 		MetricType: operatormetrics.GaugeType,
 		Expr: intstr.FromString(

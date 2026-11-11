@@ -63,6 +63,7 @@ import (
 	"github.com/kubevirt/kubevirt-observability-controller/pkg/monitoring/metrics"
 	"github.com/kubevirt/kubevirt-observability-controller/pkg/monitoring/metrics/devicedrivers"
 	"github.com/kubevirt/kubevirt-observability-controller/pkg/monitoring/metrics/vmstats"
+	"github.com/kubevirt/kubevirt-observability-controller/pkg/monitoring/selection"
 	"github.com/kubevirt/kubevirt-observability-controller/pkg/tlsutil"
 	// +kubebuilder:scaffold:imports
 )
@@ -131,14 +132,16 @@ func main() {
 	flag.StringVar(&tlsGroups, "tls-groups", "",
 		"Comma-separated list of OpenSSL group names. "+
 			"Only valid with --tls-security-profile=Custom.")
+	const allowlistGrammar = "Comma-separated list of group names or individual %s. " +
+		"Empty (default) selects the groups KubeVirt does not itself publish. " +
+		"A bare list is absolute but prefixing every entry with + or - adjusts the default set. " +
+		"\"all\" and \"none\" select everything or nothing."
 	flag.StringVar(&metricsAllowlist, "metrics-allowlist", "",
-		"Comma-separated list of metric names to expose. Empty (default) exposes all. \"none\" disables all custom metrics.")
+		fmt.Sprintf(allowlistGrammar, "metric names to expose"))
 	flag.StringVar(&alertsAllowlistRaw, "alerts-allowlist", "",
-		"Comma-separated list of alert names to include in the PrometheusRule. "+
-			"Empty (default) includes all. \"none\" disables all alerts.")
+		fmt.Sprintf(allowlistGrammar, "alert names to include in the PrometheusRule"))
 	flag.StringVar(&recordingRulesAllowlistRaw, "recording-rules-allowlist", "",
-		"Comma-separated list of recording rule names to include in the PrometheusRule. "+
-			"Empty (default) includes all. \"none\" disables all recording rules.")
+		fmt.Sprintf(allowlistGrammar, "recording rule names to include in the PrometheusRule"))
 	var enableVMStats bool
 	var vmstatsOpts vmstatsOptions
 	flag.BoolVar(&enableVMStats, "enable-vmstats", false,
@@ -275,14 +278,6 @@ func main() {
 		})
 	}
 
-	allowlist := parseAllowlist(metricsAllowlist)
-	alertsAllowlist := parseAllowlist(alertsAllowlistRaw)
-	recordingRulesAllowlist := parseAllowlist(recordingRulesAllowlistRaw)
-	if err := metrics.SetupMetrics(nil, nil, allowlist); err != nil {
-		setupLog.Error(err, "unable to set up metrics")
-		os.Exit(1)
-	}
-
 	podNamespace := getPodNamespace()
 	serviceAccountName := os.Getenv("POD_SERVICE_ACCOUNT")
 
@@ -293,6 +288,18 @@ func main() {
 
 	if serviceAccountName == "" {
 		setupLog.Error(fmt.Errorf("POD_SERVICE_ACCOUNT not set"), "missing required environment variable")
+		os.Exit(1)
+	}
+
+	sel, err := selection.ForFlags(podNamespace, metricsAllowlist, recordingRulesAllowlistRaw, alertsAllowlistRaw)
+	if err != nil {
+		setupLog.Error(err, "invalid allowlist")
+		os.Exit(1)
+	}
+	allowlist := sel.Metrics
+
+	if err := metrics.SetupMetrics(nil, nil, allowlist); err != nil {
+		setupLog.Error(err, "unable to set up metrics")
 		os.Exit(1)
 	}
 
@@ -361,8 +368,8 @@ func main() {
 		Client:                  mgr.GetClient(),
 		Scheme:                  mgr.GetScheme(),
 		Namespace:               podNamespace,
-		AlertsAllowlist:         alertsAllowlist,
-		RecordingRulesAllowlist: recordingRulesAllowlist,
+		AlertsAllowlist:         sel.Alerts,
+		RecordingRulesAllowlist: sel.RecordingRules,
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "PrometheusRule")
 		os.Exit(1)
@@ -393,7 +400,7 @@ func main() {
 		setupLog.Info("VMStats polling disabled")
 	}
 
-	logAllowlistStatus(allowlist)
+	sel.Log(setupLog)
 
 	// +kubebuilder:scaffold:builder
 
@@ -427,28 +434,6 @@ func main() {
 		setupLog.Error(err, "problem running manager")
 		os.Exit(1)
 	}
-}
-
-// logAllowlistStatus must run once every collector is registered, otherwise
-// metrics registered later are reported as unknown names.
-func logAllowlistStatus(allowlist map[string]bool) {
-	if allowlist == nil {
-		return
-	}
-
-	registered := metrics.ListMetrics()
-	registeredNames := make(map[string]bool, len(registered))
-	for _, m := range registered {
-		registeredNames[m.GetOpts().Name] = true
-	}
-
-	for name := range allowlist {
-		if !registeredNames[name] {
-			setupLog.Info("metrics-allowlist contains unknown metric name", "metric", name)
-		}
-	}
-
-	setupLog.Info("metrics allowlist active", "count", len(registered))
 }
 
 type vmstatsOptions struct {
@@ -581,23 +566,4 @@ func parseMetricsPort(addr string) (int32, error) {
 	}
 
 	return int32(port), nil
-}
-
-func parseAllowlist(raw string) map[string]bool {
-	if raw == "" {
-		return nil
-	}
-	if raw == "none" {
-		return map[string]bool{}
-	}
-
-	parts := strings.Split(raw, ",")
-	allowlist := make(map[string]bool, len(parts))
-	for _, p := range parts {
-		if name := strings.TrimSpace(p); name != "" {
-			allowlist[name] = true
-		}
-	}
-
-	return allowlist
 }

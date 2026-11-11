@@ -26,6 +26,7 @@ import (
 	"github.com/rhobs/operator-observability-toolkit/pkg/operatormetrics"
 	ctrl "sigs.k8s.io/controller-runtime"
 
+	"github.com/kubevirt/kubevirt-observability-controller/pkg/monitoring/groups"
 	"github.com/kubevirt/kubevirt-observability-controller/pkg/monitoring/metrics"
 )
 
@@ -39,27 +40,33 @@ var (
 	}
 
 	guestHostname = operatormetrics.NewGauge(operatormetrics.MetricOpts{
-		Name: "kubevirt_vmi_guest_hostname",
-		Help: "Guest hostname from the guest agent.",
+		Name:        "kubevirt_vmi_guest_hostname",
+		ExtraFields: groups.Tag(groups.GuestAgent),
+		Help:        "Guest hostname from the guest agent.",
 	})
 	guestTimezone = operatormetrics.NewGauge(operatormetrics.MetricOpts{
-		Name: "kubevirt_vmi_guest_timezone",
-		Help: "Guest timezone from the guest agent.",
+		Name:        "kubevirt_vmi_guest_timezone",
+		ExtraFields: groups.Tag(groups.GuestAgent),
+		Help:        "Guest timezone from the guest agent.",
 	})
 	guestUserCount = operatormetrics.NewGauge(operatormetrics.MetricOpts{
-		Name: "kubevirt_vmi_guest_user_count",
-		Help: "Number of logged-in users in the guest.",
+		Name:        "kubevirt_vmi_guest_user_count",
+		ExtraFields: groups.Tag(groups.GuestAgent),
+		Help:        "Number of logged-in users in the guest.",
 	})
 	filesystemCapacityBytes = operatormetrics.NewGauge(operatormetrics.MetricOpts{
-		Name: "kubevirt_vmi_filesystem_capacity_bytes",
-		Help: "Total VM filesystem capacity in bytes.",
+		Name:        "kubevirt_vmi_filesystem_capacity_bytes",
+		ExtraFields: groups.Tag(groups.GuestFilesystem),
+		Help:        "Total VM filesystem capacity in bytes.",
 	})
 	filesystemUsedBytes = operatormetrics.NewGauge(operatormetrics.MetricOpts{
-		Name: "kubevirt_vmi_filesystem_used_bytes",
-		Help: "Used VM filesystem capacity in bytes.",
+		Name:        "kubevirt_vmi_filesystem_used_bytes",
+		ExtraFields: groups.Tag(groups.GuestFilesystem),
+		Help:        "Used VM filesystem capacity in bytes.",
 	})
 	guestDeviceDriverTimestamp = operatormetrics.NewGauge(operatormetrics.MetricOpts{
-		Name: "kubevirt_vmi_guest_device_driver_timestamp_seconds",
+		Name:        "kubevirt_vmi_guest_device_driver_timestamp_seconds",
+		ExtraFields: groups.Tag(groups.GuestDrivers),
 		Help: "Release date of the driver of a guest device, in seconds since the epoch, " +
 			"as reported by the guest agent. Windows guests only.",
 	})

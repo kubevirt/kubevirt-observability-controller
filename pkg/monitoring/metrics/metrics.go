@@ -37,6 +37,28 @@ var (
 func getStores() *Stores     { return storesRef.Load() }
 func getIndexers() *Indexers { return indexersRef.Load() }
 
+// AllCollectors returns every collector the controller can register, before
+// any filtering. The selection layer reads group membership from it, so it has
+// to be available without registering anything.
+func AllCollectors() []operatormetrics.Collector {
+	return []operatormetrics.Collector{
+		vmi.NewMigrationStatsCollector(func() cache.Store {
+			idx := getIndexers()
+			if idx == nil {
+				return nil
+			}
+			return idx.VMIMigration
+		}),
+		VMIStatsCollector,
+		VMStatsCollector,
+		vm.NewVMSnapshotStatsCollector(inventoryStore(func(s *Stores) cache.Store { return s.VMSnapshot })),
+		vm.NewVMRestoreStatsCollector(inventoryStore(func(s *Stores) cache.Store { return s.VMRestore })),
+		vm.NewVMExportStatsCollector(inventoryStore(func(s *Stores) cache.Store { return s.VMExport })),
+		vm.NewVMCloneStatsCollector(inventoryStore(func(s *Stores) cache.Store { return s.VMClone })),
+		vm.NewVMPoolStatsCollector(inventoryStore(func(s *Stores) cache.Store { return s.VMPool })),
+	}
+}
+
 // SetupMetrics registers metric collectors filtered by the given allowlist.
 // A nil allowlist registers all metrics. An empty (non-nil) map registers none.
 func SetupMetrics(metricsStores *Stores, metricsIndexers *Indexers, allowlist map[string]bool) error {
@@ -53,22 +75,7 @@ func SetupMetrics(metricsStores *Stores, metricsIndexers *Indexers, allowlist ma
 	operatormetrics.Register = ctrlmetrics.Registry.Register
 	operatormetrics.Unregister = ctrlmetrics.Registry.Unregister
 
-	allCollectors := []operatormetrics.Collector{
-		vmi.NewMigrationStatsCollector(func() cache.Store {
-			idx := getIndexers()
-			if idx == nil {
-				return nil
-			}
-			return idx.VMIMigration
-		}),
-		VMIStatsCollector,
-		VMStatsCollector,
-		vm.NewVMSnapshotStatsCollector(inventoryStore(func(s *Stores) cache.Store { return s.VMSnapshot })),
-		vm.NewVMRestoreStatsCollector(inventoryStore(func(s *Stores) cache.Store { return s.VMRestore })),
-		vm.NewVMExportStatsCollector(inventoryStore(func(s *Stores) cache.Store { return s.VMExport })),
-		vm.NewVMCloneStatsCollector(inventoryStore(func(s *Stores) cache.Store { return s.VMClone })),
-		vm.NewVMPoolStatsCollector(inventoryStore(func(s *Stores) cache.Store { return s.VMPool })),
-	}
+	allCollectors := AllCollectors()
 
 	if allowlist == nil {
 		return operatormetrics.RegisterCollector(allCollectors...)
