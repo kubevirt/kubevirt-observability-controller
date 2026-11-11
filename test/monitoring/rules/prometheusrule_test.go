@@ -57,22 +57,24 @@ var _ = Describe("PrometheusRule Reconciliation", func() {
 		Expect(rules.RecordingRuleCount(pr)).To(BeNumerically(">", 0))
 	})
 
+	// The suite deploys without allowlist flags, which selects only the groups
+	// KubeVirt does not publish. "Group Selection" covers the virt-* groups
+	// by deploying with every group selected.
 	It("should contain expected alerts", func() {
 		pr, err := rules.GetPrometheusRule(kvNamespace, prometheusRuleName)
 		Expect(err).ToNot(HaveOccurred())
-		alertNames := rules.AlertNames(pr)
-		Expect(alertNames).To(ContainElements(
-			"VirtAPIDown", "VirtControllerDown", "VirtOperatorDown"))
+		Expect(rules.AlertNames(pr)).To(ConsistOf(
+			"OutdatedGuestDeviceDrivers",
+			"KubeVirtVMIOrdinalPodInterfaceName",
+			"VirtualMachineInstanceHasEphemeralHotplugVolume",
+		))
 	})
 
 	It("should contain expected recording rules", func() {
 		pr, err := rules.GetPrometheusRule(kvNamespace, prometheusRuleName)
 		Expect(err).ToNot(HaveOccurred())
-		rrNames := rules.RecordingRuleNames(pr)
-		Expect(rrNames).To(ContainElements(
-			"cluster:kubevirt_virt_api_up:sum",
-			"namespace:kubevirt_vm:sum",
-			"node:kubevirt_vmi_phase:sum",
+		Expect(rules.RecordingRuleNames(pr)).To(ConsistOf(
+			"vmi:kubevirt_vmi_guest_device_driver_timestamp_seconds:max",
 		))
 	})
 

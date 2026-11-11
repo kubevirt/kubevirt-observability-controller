@@ -31,9 +31,7 @@ import (
 
 var _ = Describe("Metrics Allowlist", Ordered, func() {
 	AfterAll(func() {
-		err := lib.RedeployController(kvNamespace, image,
-			"--enable-vmstats",
-			"--vmstats-cert-path=/etc/monitoring/clientcertificates")
+		err := lib.RedeployController(kvNamespace, image, baselineArgs...)
 		Expect(err).ToNot(HaveOccurred())
 	})
 
@@ -86,3 +84,81 @@ var _ = Describe("Metrics Allowlist", Ordered, func() {
 			"controller-runtime metrics should not be affected by the allowlist")
 	})
 })
+
+var _ = Describe("Metrics Group Selection", Ordered, func() {
+	// vmstats metrics arrive on a 30s poll, so presence has to be waited for
+	// rather than scraped once. Absence is only meaningful once something
+	// from the same deployment has shown up, so every spec waits on a
+	// positive first.
+	expectEventually := func(present string, absent ...string) {
+		var output string
+		Eventually(func(g Gomega) bool {
+			out, err := metrics.Scrape(kvNamespace, metricsServiceName)
+			g.Expect(err).ToNot(HaveOccurred())
+			output = out
+			return metrics.HasMetric(out, present)
+		}, 5*time.Minute, 10*time.Second).Should(BeTrue(),
+			"%s is in a selected group and should be exposed", present)
+
+		for _, name := range absent {
+			Expect(metrics.HasMetric(output, name)).To(BeFalse(),
+				"%s is not in a selected group and should be filtered out", name)
+		}
+	}
+
+	redeploy := func(extra ...string) {
+		args := append([]string{
+			"--enable-vmstats",
+			"--vmstats-cert-path=/etc/monitoring/clientcertificates",
+		}, extra...)
+		Expect(lib.RedeployController(kvNamespace, image, args...)).To(Succeed())
+	}
+
+	// Restore the suite baseline rather than the default selection: specs in
+	// later files assert on metrics the default set leaves out.
+	AfterAll(func() {
+		Expect(lib.RedeployController(kvNamespace, image, baselineArgs...)).To(Succeed())
+	})
+
+	// The reason the group layer exists: with no allowlist, nothing the
+	// controller exposes collides with a series KubeVirt already publishes.
+	It("should expose only the non-duplicating groups by default", func() {
+		redeploy()
+
+		expectEventually("kubevirt_vmi_guest_hostname",
+			"kubevirt_vmi_info",
+			"kubevirt_vm_info",
+			"kubevirt_vmi_memory_resident_bytes",
+			"kubevirt_vmi_filesystem_used_bytes",
+		)
+		Expect(metrics.HasMetric(mustScrape(), "kubevirt_vmi_guest_os_info")).To(BeTrue(),
+			"guest-os is on by default")
+	})
+
+	It("should select a whole group by name", func() {
+		redeploy("--metrics-allowlist=guest-agent")
+
+		expectEventually("kubevirt_vmi_guest_hostname",
+			"kubevirt_vmi_guest_os_info",
+			"kubevirt_vmi_info",
+		)
+		Expect(metrics.HasMetric(mustScrape(), "kubevirt_vmi_guest_timezone")).To(BeTrue(),
+			"guest-agent owns the timezone metric too")
+	})
+
+	It("should add a group to the defaults with +", func() {
+		redeploy("--metrics-allowlist=+vmi-status")
+
+		expectEventually("kubevirt_vmi_info",
+			"kubevirt_vm_info",
+		)
+		Expect(metrics.HasMetric(mustScrape(), "kubevirt_vmi_guest_os_info")).To(BeTrue(),
+			"the default groups are still selected alongside vmi-status")
+	})
+})
+
+func mustScrape() string {
+	out, err := metrics.Scrape(kvNamespace, metricsServiceName)
+	Expect(err).ToNot(HaveOccurred())
+	return out
+}
