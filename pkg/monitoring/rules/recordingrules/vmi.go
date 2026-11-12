@@ -62,7 +62,9 @@ var vmiRecordingRules = []operatorrules.RecordingRule{
 		},
 		MetricType: operatormetrics.GaugeType,
 		Expr: intstr.FromString(
-			"sum by (name, namespace) (clamp_min(kubevirt_vmi_guest_load_1m - vmi:kubevirt_vmi_vcpu:count, 0))",
+			"clamp_min(" +
+				"sum by (name, namespace) (kubevirt_vmi_guest_load_1m) - " +
+				"sum by (name, namespace) (vmi:kubevirt_vmi_vcpu:count), 0)",
 		),
 	},
 	{
