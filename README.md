@@ -87,6 +87,7 @@ all three flags.
 
 - [Deployment Guide](docs/deployment.md) — build, deploy, configure, and verify
 - [Metrics Reference](docs/metrics.md) — full list of exposed metrics and recording rules
+- [Monitoring Guidelines](docs/monitoring-guidelines.md) — conventions for alerts and recording rules
 - [Running E2E Tests](docs/running-e2e-tests.md) — how to run end-to-end tests with kubevirtci
 
 ## Development

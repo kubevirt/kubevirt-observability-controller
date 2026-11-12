@@ -130,15 +130,42 @@ var vmiStatusAlerts = []promv1.Rule{
 	},
 	{
 		Alert: "VMNonRecoverableOSPanic",
+		// Diverges from kubevirt's original expression. The panic counter
+		// is process-local in virt-handler: it resets when the handler
+		// restarts, and a handler that starts observing an already
+		// panicking VMI (after a restart or a live migration) begins a
+		// fresh series at 1 instead of the VMI's lifetime count. The
+		// new-counter fallback is therefore decided per exporter series,
+		// keeping the instance and pod labels: a series exposed by a new
+		// virt-handler is treated as new, while the previous handler's
+		// stale series falls back to increase(). A new series counts its
+		// first sample in the window plus the reset-aware increase:
+		// increase() alone excludes the initial value, and the current
+		// value alone loses panics from before a mid-window reset. The
+		// first sample equals last_over_time minus delta, the raw
+		// difference between the last and first samples. delta() and
+		// increase() need at least two samples, so a series scraped
+		// only once in the window falls back to its current value,
+		// which is also its first sample. last_over_time also tolerates
+		// scrape gaps at the 24h mark so an old counter is not mistaken
+		// for a new one.
 		Expr: intstr.FromString(withVMLabel(`
 			floor(
-				(
-					sum by (namespace, name) (kubevirt_vmi_guest_os_panic_total)
-					unless
-					sum by (namespace, name) (kubevirt_vmi_guest_os_panic_total offset 24h)
+				sum by (namespace, name) (
+					(
+						(
+							last_over_time(kubevirt_vmi_guest_os_panic_total[24h])
+							- delta(kubevirt_vmi_guest_os_panic_total[24h])
+							+ increase(kubevirt_vmi_guest_os_panic_total[24h])
+						)
+						unless last_over_time(kubevirt_vmi_guest_os_panic_total[30m] offset 24h)
+					)
+					or (
+						last_over_time(kubevirt_vmi_guest_os_panic_total[24h])
+						unless last_over_time(kubevirt_vmi_guest_os_panic_total[30m] offset 24h)
+					)
+					or increase(kubevirt_vmi_guest_os_panic_total[24h])
 				)
-				or
-				sum by (namespace, name) (increase(kubevirt_vmi_guest_os_panic_total[24h]))
 			) > 5
 		`)),
 		For: ptr.To(promv1.Duration("1m")),

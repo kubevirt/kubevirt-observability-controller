@@ -74,6 +74,12 @@ reviews:
           pkg/monitoring/rules/alerts/vms.go; when porting or copying an alert,
           copy its current expression including dedup (topk) and namespace
           filters, and port the matching promtool fixture cases.
+        - Approved exception: VMNonRecoverableOSPanic intentionally diverges
+          from kubevirt. Its new-counter fallback is decided per exporter
+          series (the panic counter is process-local in virt-handler), not
+          after aggregating by VM as kubevirt does. See
+          docs/monitoring-guidelines.md; do not flag this divergence or
+          restore kubevirt's aggregated form during syncs.
     - path: "pkg/monitoring/metrics/**"
       instructions: |
         Metrics collectors:

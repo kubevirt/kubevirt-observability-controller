@@ -954,3 +954,210 @@ tests:
           namespace: test
           name: vm-02
           vm: vm-02
+
+  # Mixed counter lifetimes: the kernel_panic counter existed 24h ago while
+  # the bugcheck counter was created inside the window. The new-counter
+  # fallback must apply per series, so the six panics on the new counter are
+  # counted instead of being suppressed by the sibling series and lost to
+  # increase() extrapolation. A 1m interval keeps the current-value branch
+  # continuously present between evaluations.
+  - interval: 1m
+    input_series:
+    - series: kubevirt_vmi_guest_os_panic_total{namespace="test", name="vm-03", type="kernel_panic", bugcheck_code="unknown"}
+      values: 2x2880
+    - series: kubevirt_vmi_guest_os_panic_total{namespace="test", name="vm-03", type="bugcheck", bugcheck_code="0x123"}
+      values: _x1800 6x1080
+    alert_rule_test:
+    - eval_time: 24h
+      alertname: VMNonRecoverableOSPanic
+      exp_alerts: []
+    - eval_time: 48h
+      alertname: VMNonRecoverableOSPanic
+      exp_alerts:
+      - exp_annotations:
+          summary: VM vm-03 in namespace test experienced a non-recoverable guest OS panic
+          description: The VM has experienced 6 non-recoverable guest OS panic(s) in the last 24 hours.
+          runbook_url: https://kubevirt.io/monitoring/runbooks/VMNonRecoverableOSPanic
+        exp_labels:
+          severity: critical
+          operator_health_impact: none
+          kubernetes_operator_part_of: kubevirt
+          kubernetes_operator_component: kubevirt
+          namespace: test
+          name: vm-03
+          vm: vm-03
+
+  # A constant lifetime counter with a scrape gap at the 24h mark must not be
+  # mistaken for a newly created counter: the lifetime count of 6 must not
+  # fire a false critical alert for a VM with no panics in the last day.
+  # 48h1m is inside the window where the previous offset-24h point lookup
+  # found no sample and misclassified the counter as new.
+  - interval: 1m
+    input_series:
+    - series: kubevirt_vmi_guest_os_panic_total{namespace="test", name="vm-04", type="unknown", bugcheck_code="unknown"}
+      values: 6x1435 _x10 6x1435
+    alert_rule_test:
+    - eval_time: 48h1m
+      alertname: VMNonRecoverableOSPanic
+      exp_alerts: []
+    - eval_time: 49h
+      alertname: VMNonRecoverableOSPanic
+      exp_alerts: []
+
+  # Live migration: the panic counter is process-local, so the virt-handler
+  # on the target node starts a fresh series (at 1) while the source
+  # handler's series goes stale. The new-counter fallback must be decided
+  # per exporter series: the target's new series is not suppressed by the
+  # source series that existed 24h ago, whose increase() alone would only
+  # report 5 of the 6 panics observed in the last day.
+  - interval: 1m
+    input_series:
+    - series: kubevirt_vmi_guest_os_panic_total{namespace="test", name="vm-05", type="unknown", bugcheck_code="unknown", instance="10.0.0.1:8443"}
+      values: 2x1800 _x1080
+    - series: kubevirt_vmi_guest_os_panic_total{namespace="test", name="vm-05", type="unknown", bugcheck_code="unknown", instance="10.0.0.2:8443"}
+      values: _x1800 1x600 6x479
+    alert_rule_test:
+    - eval_time: 24h
+      alertname: VMNonRecoverableOSPanic
+      exp_alerts: []
+    - eval_time: 48h
+      alertname: VMNonRecoverableOSPanic
+      exp_alerts:
+      - exp_annotations:
+          summary: VM vm-05 in namespace test experienced a non-recoverable guest OS panic
+          description: The VM has experienced 6 non-recoverable guest OS panic(s) in the last 24 hours.
+          runbook_url: https://kubevirt.io/monitoring/runbooks/VMNonRecoverableOSPanic
+        exp_labels:
+          severity: critical
+          operator_health_impact: none
+          kubernetes_operator_part_of: kubevirt
+          kubernetes_operator_component: kubevirt
+          namespace: test
+          name: vm-05
+          vm: vm-05
+
+  # A counter that first appears inside the window and then resets (the
+  # virt-handler process restarted while the series kept its labels) must
+  # keep both its initial contribution and the reset-aware increase: the
+  # first sample 3 plus the 7 panics counted across the reset total 10,
+  # not the post-reset current value of 3 or the increase of 7 alone.
+  - interval: 1m
+    input_series:
+    - series: kubevirt_vmi_guest_os_panic_total{namespace="test", name="vm-06", type="unknown", bugcheck_code="unknown"}
+      values: _x1800 3x540 7x60 0x60 3x420
+    alert_rule_test:
+    - eval_time: 24h
+      alertname: VMNonRecoverableOSPanic
+      exp_alerts: []
+    - eval_time: 48h
+      alertname: VMNonRecoverableOSPanic
+      exp_alerts:
+      - exp_annotations:
+          summary: VM vm-06 in namespace test experienced a non-recoverable guest OS panic
+          description: The VM has experienced 10 non-recoverable guest OS panic(s) in the last 24 hours.
+          runbook_url: https://kubevirt.io/monitoring/runbooks/VMNonRecoverableOSPanic
+        exp_labels:
+          severity: critical
+          operator_health_impact: none
+          kubernetes_operator_part_of: kubevirt
+          kubernetes_operator_component: kubevirt
+          namespace: test
+          name: vm-06
+          vm: vm-06
+
+  # Threshold-crossing combination of a fresh series and a mid-window
+  # reset: the counter starts at 1, climbs to 3, resets, and climbs to 3
+  # again, so 6 panics occurred in the window. Neither the current value
+  # (3) nor increase() alone (5, the initial value is excluded) crosses
+  # the threshold; only the first sample plus the reset-aware increase
+  # does.
+  - interval: 1m
+    input_series:
+    - series: kubevirt_vmi_guest_os_panic_total{namespace="test", name="vm-07", type="unknown", bugcheck_code="unknown"}
+      values: _x1800 1x540 3x60 0x60 3x420
+    alert_rule_test:
+    - eval_time: 24h
+      alertname: VMNonRecoverableOSPanic
+      exp_alerts: []
+    - eval_time: 48h
+      alertname: VMNonRecoverableOSPanic
+      exp_alerts:
+      - exp_annotations:
+          summary: VM vm-07 in namespace test experienced a non-recoverable guest OS panic
+          description: The VM has experienced 6 non-recoverable guest OS panic(s) in the last 24 hours.
+          runbook_url: https://kubevirt.io/monitoring/runbooks/VMNonRecoverableOSPanic
+        exp_labels:
+          severity: critical
+          operator_health_impact: none
+          kubernetes_operator_part_of: kubevirt
+          kubernetes_operator_component: kubevirt
+          namespace: test
+          name: vm-07
+          vm: vm-07
+
+  # Single observed sample: a virt-handler that starts observing an
+  # already-panicking VMI is scraped once and then disappears (crash or
+  # live migration) before a second sample. delta() and increase() need
+  # two samples and return nothing for such a series, so the
+  # new-counter fallback must use the counter's current value: the
+  # single sample of 6 is also the series' first sample and must fire
+  # the alert, for as long as the sample stays inside the 24h window.
+  - interval: 1m
+    input_series:
+    - series: kubevirt_vmi_guest_os_panic_total{namespace="test", name="vm-08", type="unknown", bugcheck_code="unknown"}
+      values: 6
+    alert_rule_test:
+    - eval_time: 2m
+      alertname: VMNonRecoverableOSPanic
+      exp_alerts:
+      - exp_annotations:
+          summary: VM vm-08 in namespace test experienced a non-recoverable guest OS panic
+          description: The VM has experienced 6 non-recoverable guest OS panic(s) in the last 24 hours.
+          runbook_url: https://kubevirt.io/monitoring/runbooks/VMNonRecoverableOSPanic
+        exp_labels:
+          severity: critical
+          operator_health_impact: none
+          kubernetes_operator_part_of: kubevirt
+          kubernetes_operator_component: kubevirt
+          namespace: test
+          name: vm-08
+          vm: vm-08
+    - eval_time: 1h
+      alertname: VMNonRecoverableOSPanic
+      exp_alerts:
+      - exp_annotations:
+          summary: VM vm-08 in namespace test experienced a non-recoverable guest OS panic
+          description: The VM has experienced 6 non-recoverable guest OS panic(s) in the last 24 hours.
+          runbook_url: https://kubevirt.io/monitoring/runbooks/VMNonRecoverableOSPanic
+        exp_labels:
+          severity: critical
+          operator_health_impact: none
+          kubernetes_operator_part_of: kubevirt
+          kubernetes_operator_component: kubevirt
+          namespace: test
+          name: vm-08
+          vm: vm-08
+
+  # Ephemeral hotplug volumes are deprecated. The alert must fire with
+  # the vm typed resource label so it links to the VM resource page.
+  - interval: 1m
+    input_series:
+    - series: kubevirt_vmi_contains_ephemeral_hotplug_volume{namespace="test", name="vm-09", volume_name="hotplug-pvc"}
+      values: 1x10
+    alert_rule_test:
+    - eval_time: 2m
+      alertname: VirtualMachineInstanceHasEphemeralHotplugVolume
+      exp_alerts:
+      - exp_annotations:
+          summary: Virtual Machine Instance has Ephemeral Hotplug Volume(s). Ephemeral Hotplugs are deprecated and must be converted to persistent volumes! In a future release, feature gate `DeclarativeHotplugVolumes` will replace `HotplugVolumes` and as a result, any remaining ephemeral hotplug volumes will be automatically unplugged
+          description: Virtual Machine Instance vm-09 in namespace test has ephemeral hotplug volume(s) hotplug-pvc.
+          runbook_url: https://kubevirt.io/monitoring/runbooks/VirtualMachineInstanceHasEphemeralHotplugVolume
+        exp_labels:
+          severity: warning
+          operator_health_impact: none
+          kubernetes_operator_part_of: kubevirt
+          kubernetes_operator_component: kubevirt
+          namespace: test
+          name: vm-09
+          volume_name: hotplug-pvc
+          vm: vm-09
