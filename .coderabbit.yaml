@@ -211,6 +211,8 @@ knowledge_base:
       instructions: "Core virtualization platform. The controller reads the vmstats API and VMI status from KubeVirt; metric names and labels must stay compatible with the ones KubeVirt exposes. Use to verify vmstats fields, VMI status semantics, and existing metric definitions."
     - repository: "kubevirt/monitoring"
       instructions: "Alert runbooks and monitoring guidelines. Every alert's runbook_url must point to a published runbook here. Use to check whether a runbook exists before an alert is added."
+    - repository: "kubevirt/hyperconverged-cluster-operator"
+      instructions: "Deploys the controller as part of OpenShift Virtualization (CNV). Use to verify how the controller is deployed and configured there: command-line flags, RBAC, and deployment manifests."
     - repository: "kubevirt/kubevirtci"
       instructions: "Cluster definitions and tooling for the ephemeral clusters used by the e2e tests."
     - repository: "kubevirt/community"
