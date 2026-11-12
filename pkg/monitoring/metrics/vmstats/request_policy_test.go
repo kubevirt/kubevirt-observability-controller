@@ -263,6 +263,26 @@ var _ = Describe("NewRequestPolicy", func() {
 			Expect(NewRequestPolicy(map[string]bool{name: true}).Enabled()).To(BeTrue(), name)
 		}
 	})
+
+	DescribeTable("resolves the block latency histogram allowlist", func(allowed bool) {
+		policy := NewRequestPolicy(map[string]bool{blockIOLatencyMetricName: allowed})
+		Expect(policy.Enabled()).To(Equal(allowed))
+
+		req := policy.Resolve(vmiWithOSID("rhel"), "8.2.0")
+		if !allowed {
+			Expect(req).To(BeNil())
+			return
+		}
+
+		Expect(req).ToNot(BeNil())
+		Expect(req.DomainStats).ToNot(BeNil())
+		Expect(req.DirtyRate).To(BeNil())
+		Expect(req.GuestGetHostName).To(BeNil())
+		Expect(req.GuestGetTimezone).To(BeNil())
+		Expect(req.GuestGetUsers).To(BeNil())
+		Expect(req.GuestGetFsInfo).To(BeNil())
+		Expect(req.GuestGetDevices).To(BeNil())
+	}, Entry("requests domainStats when only the histogram is enabled", true), Entry("disables polling when the histogram is disabled", false))
 })
 
 var _ = Describe("buildRequest", func() {

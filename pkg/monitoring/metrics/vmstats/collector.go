@@ -23,6 +23,8 @@ import (
 
 	"github.com/rhobs/operator-observability-toolkit/pkg/operatormetrics"
 	ctrlmetrics "sigs.k8s.io/controller-runtime/pkg/metrics"
+
+	"github.com/kubevirt/kubevirt-observability-controller/pkg/monitoring/metrics"
 )
 
 func RegisterCollector(cache *StatsCache, allowlist map[string]bool) error {
@@ -32,14 +34,24 @@ func RegisterCollector(cache *StatsCache, allowlist map[string]bool) error {
 	collector := vmStatsCollector(cache)
 
 	if allowlist == nil {
-		return operatormetrics.RegisterCollector(collector)
+		if err := operatormetrics.RegisterCollector(collector); err != nil {
+			return err
+		}
 	}
 
 	filtered := filterVMStatsCollector(collector, allowlist)
-	if filtered == nil {
-		return nil
+	if filtered != nil {
+		if err := operatormetrics.RegisterCollector(*filtered); err != nil {
+			return err
+		}
 	}
-	return operatormetrics.RegisterCollector(*filtered)
+	return metrics.RegisterCustomCollectors(
+		allowlist,
+		metrics.CustomCollector{
+			MetricName: blockIOLatencyMetricName,
+			Collector:  newBlockLatencyCollector(cache),
+		},
+	)
 }
 
 func vmStatsCollector(cache *StatsCache) operatormetrics.Collector {
