@@ -27,6 +27,7 @@ import (
 	"k8s.io/client-go/tools/cache"
 	k6tv1 "kubevirt.io/api/core/v1"
 
+	"github.com/kubevirt/kubevirt-observability-controller/pkg/monitoring/groups"
 	"github.com/kubevirt/kubevirt-observability-controller/pkg/monitoring/metrics/internal/inventory"
 )
 
@@ -62,52 +63,59 @@ func NewMigrationStatsCollector(getStore func() cache.Store) operatormetrics.Col
 var (
 	PendingMigrations = operatormetrics.NewGauge(
 		operatormetrics.MetricOpts{
-			Name: "kubevirt_vmi_migrations_in_pending_phase",
-			Help: "Number of current pending migrations.",
+			Name:        "kubevirt_vmi_migrations_in_pending_phase",
+			ExtraFields: groups.Tag(groups.VMIMigration),
+			Help:        "Number of current pending migrations.",
 		},
 	)
 
 	SchedulingMigrations = operatormetrics.NewGauge(
 		operatormetrics.MetricOpts{
-			Name: "kubevirt_vmi_migrations_in_scheduling_phase",
-			Help: "Number of current scheduling migrations.",
+			Name:        "kubevirt_vmi_migrations_in_scheduling_phase",
+			ExtraFields: groups.Tag(groups.VMIMigration),
+			Help:        "Number of current scheduling migrations.",
 		},
 	)
 
 	UnsetMigration = operatormetrics.NewGauge(
 		operatormetrics.MetricOpts{
-			Name: "kubevirt_vmi_migrations_in_unset_phase",
-			Help: "Number of current unset migrations.",
+			Name:        "kubevirt_vmi_migrations_in_unset_phase",
+			ExtraFields: groups.Tag(groups.VMIMigration),
+			Help:        "Number of current unset migrations.",
 		},
 	)
 
 	RunningMigrations = operatormetrics.NewGauge(
 		operatormetrics.MetricOpts{
-			Name: "kubevirt_vmi_migrations_in_running_phase",
-			Help: "Number of current running migrations.",
+			Name:        "kubevirt_vmi_migrations_in_running_phase",
+			ExtraFields: groups.Tag(groups.VMIMigration),
+			Help:        "Number of current running migrations.",
 		},
 	)
 
 	SucceededMigration = operatormetrics.NewGaugeVec(
 		operatormetrics.MetricOpts{
-			Name: "kubevirt_vmi_migration_succeeded",
-			Help: "Indicates if the VMI migration succeeded.",
+			Name:        "kubevirt_vmi_migration_succeeded",
+			ExtraFields: groups.Tag(groups.VMIMigration),
+			Help:        "Indicates if the VMI migration succeeded.",
 		},
 		[]string{"vmi", "vmim", "namespace"},
 	)
 
 	FailedMigration = operatormetrics.NewGaugeVec(
 		operatormetrics.MetricOpts{
-			Name: "kubevirt_vmi_migration_failed",
-			Help: "Indicates if the VMI migration failed.",
+			Name:        "kubevirt_vmi_migration_failed",
+			ExtraFields: groups.Tag(groups.VMIMigration),
+			Help:        "Indicates if the VMI migration failed.",
 		},
 		[]string{"vmi", "vmim", "namespace"},
 	)
 
 	MigrationInfo = operatormetrics.NewGaugeVec(
 		operatormetrics.MetricOpts{
-			Name: "kubevirt_vmi_migration_info",
-			Help: "Information about VirtualMachineInstanceMigrations.",
+			Name:        "kubevirt_vmi_migration_info",
+			ExtraFields: groups.Tag(groups.Inventory),
+			Help:        "Information about VirtualMachineInstanceMigrations.",
 		},
 		[]string{
 			"namespace", "vmi", "name", "uid",

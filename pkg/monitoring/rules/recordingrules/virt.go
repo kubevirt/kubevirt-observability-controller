@@ -24,14 +24,17 @@ import (
 	"github.com/rhobs/operator-observability-toolkit/pkg/operatormetrics"
 	"github.com/rhobs/operator-observability-toolkit/pkg/operatorrules"
 	"k8s.io/apimachinery/pkg/util/intstr"
+
+	"github.com/kubevirt/kubevirt-observability-controller/pkg/monitoring/groups"
 )
 
 func virtRecordingRules(namespace string) []operatorrules.RecordingRule {
 	return []operatorrules.RecordingRule{
 		{
 			MetricsOpts: operatormetrics.MetricOpts{
-				Name: "cluster:kubevirt_virt_api_up:sum",
-				Help: "The number of virt-api pods that are up.",
+				Name:        "cluster:kubevirt_virt_api_up:sum",
+				ExtraFields: groups.Tag(groups.VirtAPI),
+				Help:        "The number of virt-api pods that are up.",
 			},
 			MetricType: operatormetrics.GaugeType,
 			Expr: intstr.FromString(
@@ -40,8 +43,9 @@ func virtRecordingRules(namespace string) []operatorrules.RecordingRule {
 		},
 		{
 			MetricsOpts: operatormetrics.MetricOpts{
-				Name: "cluster:kubevirt_virt_controller_pods_running:count",
-				Help: "The number of virt-controller pods that are running.",
+				Name:        "cluster:kubevirt_virt_controller_pods_running:count",
+				ExtraFields: groups.Tag(groups.VirtController),
+				Help:        "The number of virt-controller pods that are running.",
 			},
 			MetricType: operatormetrics.GaugeType,
 			Expr: intstr.FromString(
@@ -53,8 +57,9 @@ func virtRecordingRules(namespace string) []operatorrules.RecordingRule {
 		},
 		{
 			MetricsOpts: operatormetrics.MetricOpts{
-				Name: "cluster:kubevirt_virt_controller_up:sum",
-				Help: "The number of virt-controller pods that are up.",
+				Name:        "cluster:kubevirt_virt_controller_up:sum",
+				ExtraFields: groups.Tag(groups.VirtController),
+				Help:        "The number of virt-controller pods that are up.",
 			},
 			MetricType: operatormetrics.GaugeType,
 			Expr: intstr.FromString(
@@ -63,8 +68,9 @@ func virtRecordingRules(namespace string) []operatorrules.RecordingRule {
 		},
 		{
 			MetricsOpts: operatormetrics.MetricOpts{
-				Name: "cluster:kubevirt_virt_controller_ready:sum",
-				Help: "The number of virt-controller pods that are ready.",
+				Name:        "cluster:kubevirt_virt_controller_ready:sum",
+				ExtraFields: groups.Tag(groups.VirtController),
+				Help:        "The number of virt-controller pods that are ready.",
 			},
 			MetricType: operatormetrics.GaugeType,
 			Expr: intstr.FromString(
@@ -74,8 +80,9 @@ func virtRecordingRules(namespace string) []operatorrules.RecordingRule {
 		},
 		{
 			MetricsOpts: operatormetrics.MetricOpts{
-				Name: "cluster:kubevirt_virt_operator_up:sum",
-				Help: "The number of virt-operator pods that are up.",
+				Name:        "cluster:kubevirt_virt_operator_up:sum",
+				ExtraFields: groups.Tag(groups.VirtOperator),
+				Help:        "The number of virt-operator pods that are up.",
 			},
 			MetricType: operatormetrics.GaugeType,
 			Expr: intstr.FromString(
@@ -84,8 +91,9 @@ func virtRecordingRules(namespace string) []operatorrules.RecordingRule {
 		},
 		{
 			MetricsOpts: operatormetrics.MetricOpts{
-				Name: "cluster:kubevirt_virt_operator_pods_running:count",
-				Help: "The number of virt-operator pods that are running.",
+				Name:        "cluster:kubevirt_virt_operator_pods_running:count",
+				ExtraFields: groups.Tag(groups.VirtOperator),
+				Help:        "The number of virt-operator pods that are running.",
 			},
 			MetricType: operatormetrics.GaugeType,
 			Expr: intstr.FromString(
@@ -97,8 +105,9 @@ func virtRecordingRules(namespace string) []operatorrules.RecordingRule {
 		},
 		{
 			MetricsOpts: operatormetrics.MetricOpts{
-				Name: "cluster:kubevirt_virt_operator_ready:sum",
-				Help: "The number of virt-operator pods that are ready.",
+				Name:        "cluster:kubevirt_virt_operator_ready:sum",
+				ExtraFields: groups.Tag(groups.VirtOperator),
+				Help:        "The number of virt-operator pods that are ready.",
 			},
 			MetricType: operatormetrics.GaugeType,
 			Expr: intstr.FromString(
@@ -108,8 +117,9 @@ func virtRecordingRules(namespace string) []operatorrules.RecordingRule {
 		},
 		{
 			MetricsOpts: operatormetrics.MetricOpts{
-				Name: "cluster:kubevirt_virt_operator_leading:sum",
-				Help: "The number of virt-operator pods that are leading.",
+				Name:        "cluster:kubevirt_virt_operator_leading:sum",
+				ExtraFields: groups.Tag(groups.VirtOperator),
+				Help:        "The number of virt-operator pods that are leading.",
 			},
 			MetricType: operatormetrics.GaugeType,
 			Expr: intstr.FromString(
@@ -118,8 +128,9 @@ func virtRecordingRules(namespace string) []operatorrules.RecordingRule {
 		},
 		{
 			MetricsOpts: operatormetrics.MetricOpts{
-				Name: "cluster:kubevirt_virt_handler_up:sum",
-				Help: "The number of virt-handler pods that are up.",
+				Name:        "cluster:kubevirt_virt_handler_up:sum",
+				ExtraFields: groups.Tag(groups.VirtHandler),
+				Help:        "The number of virt-handler pods that are up.",
 			},
 			MetricType: operatormetrics.GaugeType,
 			Expr: intstr.FromString(

@@ -67,9 +67,7 @@ var _ = Describe("VMStats Allowlist", Ordered, func() {
 	}
 
 	AfterAll(func() {
-		err := lib.RedeployController(kvNamespace, image,
-			"--enable-vmstats",
-			"--vmstats-cert-path=/etc/monitoring/clientcertificates")
+		err := lib.RedeployController(kvNamespace, image, baselineArgs...)
 		Expect(err).ToNot(HaveOccurred())
 	})
 

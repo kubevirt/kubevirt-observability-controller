@@ -27,6 +27,8 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/cache"
 
+	"github.com/kubevirt/kubevirt-observability-controller/pkg/monitoring/groups"
+
 	k6tv1 "kubevirt.io/api/core/v1"
 )
 
@@ -52,8 +54,9 @@ var (
 
 	vmiInfo = operatormetrics.NewGaugeVec(
 		operatormetrics.MetricOpts{
-			Name: "kubevirt_vmi_info",
-			Help: "Information about VirtualMachineInstances.",
+			Name:        "kubevirt_vmi_info",
+			ExtraFields: groups.Tag(groups.VMIStatus),
+			Help:        "Information about VirtualMachineInstances.",
 		},
 		[]string{
 			"node", "namespace", "name",
@@ -68,7 +71,8 @@ var (
 
 	vmiEvictionBlocker = operatormetrics.NewGaugeVec(
 		operatormetrics.MetricOpts{
-			Name: "kubevirt_vmi_non_evictable",
+			Name:        "kubevirt_vmi_non_evictable",
+			ExtraFields: groups.Tag(groups.VMIStatus),
 			Help: "Indication for a VirtualMachine that its eviction strategy " +
 				"is set to Live Migration but is not migratable.",
 		},
@@ -77,8 +81,9 @@ var (
 
 	vmiAddresses = operatormetrics.NewGaugeVec(
 		operatormetrics.MetricOpts{
-			Name: "kubevirt_vmi_status_addresses",
-			Help: "The addresses of a VirtualMachineInstance.",
+			Name:        "kubevirt_vmi_status_addresses",
+			ExtraFields: groups.Tag(groups.VMIStatus),
+			Help:        "The addresses of a VirtualMachineInstance.",
 		},
 		[]string{
 			"node", "namespace", "name",
@@ -88,24 +93,27 @@ var (
 
 	vmiMigrationStartTime = operatormetrics.NewGaugeVec(
 		operatormetrics.MetricOpts{
-			Name: "kubevirt_vmi_migration_start_time_seconds",
-			Help: "The time at which the migration started.",
+			Name:        "kubevirt_vmi_migration_start_time_seconds",
+			ExtraFields: groups.Tag(groups.VMIMigration),
+			Help:        "The time at which the migration started.",
 		},
 		[]string{"node", "namespace", "name", "migration_name", "uid"},
 	)
 
 	vmiMigrationEndTime = operatormetrics.NewGaugeVec(
 		operatormetrics.MetricOpts{
-			Name: "kubevirt_vmi_migration_end_time_seconds",
-			Help: "The time at which the migration ended.",
+			Name:        "kubevirt_vmi_migration_end_time_seconds",
+			ExtraFields: groups.Tag(groups.VMIMigration),
+			Help:        "The time at which the migration ended.",
 		},
 		[]string{"node", "namespace", "name", "migration_name", "uid", "status"},
 	)
 
 	vmiVnicInfo = operatormetrics.NewGaugeVec(
 		operatormetrics.MetricOpts{
-			Name: "kubevirt_vmi_vnic_info",
-			Help: "Details of VirtualMachineInstance vNIC interfaces.",
+			Name:        "kubevirt_vmi_vnic_info",
+			ExtraFields: groups.Tag(groups.VMIStatus),
+			Help:        "Details of VirtualMachineInstance vNIC interfaces.",
 		},
 		[]string{
 			"name", "namespace", "vnic_name",
@@ -116,7 +124,8 @@ var (
 
 	vmiLauncherMemoryOverhead = operatormetrics.NewGaugeVec(
 		operatormetrics.MetricOpts{
-			Name: "kubevirt_vmi_launcher_memory_overhead_bytes",
+			Name:        "kubevirt_vmi_launcher_memory_overhead_bytes",
+			ExtraFields: groups.Tag(groups.VMIStatus),
 			Help: "Estimation of the memory amount required for " +
 				"virt-launcher's infrastructure components.",
 		},
@@ -125,7 +134,8 @@ var (
 
 	vmiEphemeralHotplugVolume = operatormetrics.NewGaugeVec(
 		operatormetrics.MetricOpts{
-			Name: "kubevirt_vmi_contains_ephemeral_hotplug_volume",
+			Name:        "kubevirt_vmi_contains_ephemeral_hotplug_volume",
+			ExtraFields: groups.Tag(groups.VMIHotplug),
 			Help: "Reported only for VMIs that contain an ephemeral " +
 				"hotplug volume.",
 		},
@@ -134,8 +144,9 @@ var (
 
 	vmiGuestOSInfo = operatormetrics.NewGaugeVec(
 		operatormetrics.MetricOpts{
-			Name: "kubevirt_vmi_guest_os_info",
-			Help: "Guest OS information reported in the VMI status.",
+			Name:        "kubevirt_vmi_guest_os_info",
+			ExtraFields: groups.Tag(groups.GuestOS),
+			Help:        "Guest OS information reported in the VMI status.",
 		},
 		[]string{
 			"node", "namespace", "name",
@@ -145,7 +156,8 @@ var (
 
 	vmiGuestInterfaceInfo = operatormetrics.NewGaugeVec(
 		operatormetrics.MetricOpts{
-			Name: "kubevirt_vmi_guest_interface_info",
+			Name:        "kubevirt_vmi_guest_interface_info",
+			ExtraFields: groups.Tag(groups.VMIInterfaces),
 			Help: "Network interface information reported by the guest agent " +
 				"in the VMI status.",
 		},

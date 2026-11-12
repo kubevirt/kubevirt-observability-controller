@@ -18,7 +18,11 @@ Copyright The KubeVirt Authors.
 
 package vmstats
 
-import "github.com/rhobs/operator-observability-toolkit/pkg/operatormetrics"
+import (
+	"github.com/rhobs/operator-observability-toolkit/pkg/operatormetrics"
+
+	"github.com/kubevirt/kubevirt-observability-controller/pkg/monitoring/groups"
+)
 
 var (
 	memoryMetricsList = []operatormetrics.Metric{
@@ -29,48 +33,59 @@ var (
 	}
 
 	memoryResident = operatormetrics.NewGauge(operatormetrics.MetricOpts{
-		Name: "kubevirt_vmi_memory_resident_bytes",
-		Help: "Resident set size of the process running the domain.",
+		Name:        "kubevirt_vmi_memory_resident_bytes",
+		ExtraFields: groups.Tag(groups.VMIMemory),
+		Help:        "Resident set size of the process running the domain.",
 	})
 	memoryAvailable = operatormetrics.NewGauge(operatormetrics.MetricOpts{
-		Name: "kubevirt_vmi_memory_available_bytes",
-		Help: "Amount of usable memory as seen by the domain.",
+		Name:        "kubevirt_vmi_memory_available_bytes",
+		ExtraFields: groups.Tag(groups.VMIMemory),
+		Help:        "Amount of usable memory as seen by the domain.",
 	})
 	memoryUnused = operatormetrics.NewGauge(operatormetrics.MetricOpts{
-		Name: "kubevirt_vmi_memory_unused_bytes",
-		Help: "The amount of memory left completely unused by the system.",
+		Name:        "kubevirt_vmi_memory_unused_bytes",
+		ExtraFields: groups.Tag(groups.VMIMemory),
+		Help:        "The amount of memory left completely unused by the system.",
 	})
 	memoryCached = operatormetrics.NewGauge(operatormetrics.MetricOpts{
-		Name: "kubevirt_vmi_memory_cached_bytes",
-		Help: "The amount of memory that is being used to cache I/O and is available to be reclaimed.",
+		Name:        "kubevirt_vmi_memory_cached_bytes",
+		ExtraFields: groups.Tag(groups.VMIMemory),
+		Help:        "The amount of memory that is being used to cache I/O and is available to be reclaimed.",
 	})
 	memorySwapInTrafficBytes = operatormetrics.NewGauge(operatormetrics.MetricOpts{
-		Name: "kubevirt_vmi_memory_swap_in_traffic_bytes",
-		Help: "The total amount of data read from swap space of the guest in bytes.",
+		Name:        "kubevirt_vmi_memory_swap_in_traffic_bytes",
+		ExtraFields: groups.Tag(groups.VMIMemory),
+		Help:        "The total amount of data read from swap space of the guest in bytes.",
 	})
 	memorySwapOutTrafficBytes = operatormetrics.NewGauge(operatormetrics.MetricOpts{
-		Name: "kubevirt_vmi_memory_swap_out_traffic_bytes",
-		Help: "The total amount of memory written out to swap space of the guest in bytes.",
+		Name:        "kubevirt_vmi_memory_swap_out_traffic_bytes",
+		ExtraFields: groups.Tag(groups.VMIMemory),
+		Help:        "The total amount of memory written out to swap space of the guest in bytes.",
 	})
 	memoryPgmajfaultTotal = operatormetrics.NewCounter(operatormetrics.MetricOpts{
-		Name: "kubevirt_vmi_memory_pgmajfault_total",
-		Help: "The number of page faults when disk IO was required.",
+		Name:        "kubevirt_vmi_memory_pgmajfault_total",
+		ExtraFields: groups.Tag(groups.VMIMemory),
+		Help:        "The number of page faults when disk IO was required.",
 	})
 	memoryPgminfaultTotal = operatormetrics.NewCounter(operatormetrics.MetricOpts{
-		Name: "kubevirt_vmi_memory_pgminfault_total",
-		Help: "The number of other page faults, when disk IO was not required.",
+		Name:        "kubevirt_vmi_memory_pgminfault_total",
+		ExtraFields: groups.Tag(groups.VMIMemory),
+		Help:        "The number of other page faults, when disk IO was not required.",
 	})
 	memoryActualBalloon = operatormetrics.NewGauge(operatormetrics.MetricOpts{
-		Name: "kubevirt_vmi_memory_actual_balloon_bytes",
-		Help: "Current balloon size in bytes.",
+		Name:        "kubevirt_vmi_memory_actual_balloon_bytes",
+		ExtraFields: groups.Tag(groups.VMIMemory),
+		Help:        "Current balloon size in bytes.",
 	})
 	memoryUsableBytes = operatormetrics.NewGauge(operatormetrics.MetricOpts{
-		Name: "kubevirt_vmi_memory_usable_bytes",
-		Help: "The amount of memory which can be reclaimed by balloon without pushing the guest system to swap.",
+		Name:        "kubevirt_vmi_memory_usable_bytes",
+		ExtraFields: groups.Tag(groups.VMIMemory),
+		Help:        "The amount of memory which can be reclaimed by balloon without pushing the guest system to swap.",
 	})
 	memoryDomainBytes = operatormetrics.NewGauge(operatormetrics.MetricOpts{
-		Name: "kubevirt_vmi_memory_domain_bytes",
-		Help: "The amount of memory in bytes allocated to the domain.",
+		Name:        "kubevirt_vmi_memory_domain_bytes",
+		ExtraFields: groups.Tag(groups.VMIMemory),
+		Help:        "The amount of memory in bytes allocated to the domain.",
 	})
 )
 

@@ -223,18 +223,27 @@ func DeleteController(namespace string) error {
 	return nil
 }
 
+// WaitForControllerReady waits for the controller container to report ready.
+//
+// Readiness rather than pod phase: a container stuck in CrashLoopBackOff
+// still sits in a pod whose phase is Running, so a phase check reports
+// success for a controller that is exiting on every start.
 func WaitForControllerReady(namespace string, timeout time.Duration) error {
 	deadline := time.Now().Add(timeout)
+	var last string
 	for time.Now().Before(deadline) {
 		out, err := Kubectl("get", "pods", "-n", namespace,
 			"-l", "app="+ControllerName,
-			"-o", "jsonpath={.items[0].status.phase}")
-		if err == nil && out == "Running" {
-			return nil
+			"-o", "jsonpath={.items[0].status.containerStatuses[0].ready}")
+		if err == nil {
+			if out == "true" {
+				return nil
+			}
+			last = out
 		}
 		time.Sleep(2 * time.Second)
 	}
-	return fmt.Errorf("controller pod did not reach Running phase within %v", timeout)
+	return fmt.Errorf("controller container did not become ready within %v (last ready=%q)", timeout, last)
 }
 
 func RedeployController(namespace, image string, extraArgs ...string) error {

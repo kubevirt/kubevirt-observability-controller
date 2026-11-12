@@ -22,13 +22,16 @@ import (
 	"github.com/rhobs/operator-observability-toolkit/pkg/operatormetrics"
 	"github.com/rhobs/operator-observability-toolkit/pkg/operatorrules"
 	"k8s.io/apimachinery/pkg/util/intstr"
+
+	"github.com/kubevirt/kubevirt-observability-controller/pkg/monitoring/groups"
 )
 
 var apiRecordingRules = []operatorrules.RecordingRule{
 	{
 		MetricsOpts: operatormetrics.MetricOpts{
-			Name: "cluster:kubevirt_api_request_deprecated_total:sum",
-			Help: "The total number of requests to deprecated KubeVirt APIs, by API verb (e.g., LIST, WATCH).",
+			Name:        "cluster:kubevirt_api_request_deprecated_total:sum",
+			ExtraFields: groups.Tag(groups.VirtAPI),
+			Help:        "The total number of requests to deprecated KubeVirt APIs, by API verb (e.g., LIST, WATCH).",
 		},
 		MetricType: operatormetrics.CounterType,
 		Expr: intstr.FromString(

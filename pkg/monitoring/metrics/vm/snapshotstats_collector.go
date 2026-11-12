@@ -25,6 +25,7 @@ import (
 	"k8s.io/client-go/tools/cache"
 	snapshotv1 "kubevirt.io/api/snapshot/v1beta1"
 
+	"github.com/kubevirt/kubevirt-observability-controller/pkg/monitoring/groups"
 	"github.com/kubevirt/kubevirt-observability-controller/pkg/monitoring/metrics/internal/inventory"
 )
 
@@ -39,16 +40,18 @@ func NewVMSnapshotStatsCollector(getStore func() cache.Store) operatormetrics.Co
 var (
 	vmSnapshotInfo = operatormetrics.NewGaugeVec(
 		operatormetrics.MetricOpts{
-			Name: "kubevirt_vmsnapshot_info",
-			Help: "Information about VirtualMachineSnapshots.",
+			Name:        "kubevirt_vmsnapshot_info",
+			ExtraFields: groups.Tag(groups.Inventory),
+			Help:        "Information about VirtualMachineSnapshots.",
 		},
 		[]string{"namespace", "name", "uid", "vm", "phase", "ready_to_use"},
 	)
 
 	vmSnapshotCreationTimestamp = operatormetrics.NewGaugeVec(
 		operatormetrics.MetricOpts{
-			Name: "kubevirt_vmsnapshot_create_date_timestamp_seconds",
-			Help: "Virtual Machine Snapshot creation timestamp.",
+			Name:        "kubevirt_vmsnapshot_create_date_timestamp_seconds",
+			ExtraFields: groups.Tag(groups.Inventory),
+			Help:        "Virtual Machine Snapshot creation timestamp.",
 		},
 		[]string{"name", "namespace"},
 	)

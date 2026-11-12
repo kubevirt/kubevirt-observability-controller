@@ -22,6 +22,8 @@ import (
 	"fmt"
 
 	"github.com/rhobs/operator-observability-toolkit/pkg/operatormetrics"
+
+	"github.com/kubevirt/kubevirt-observability-controller/pkg/monitoring/groups"
 )
 
 var (
@@ -30,16 +32,19 @@ var (
 	}
 
 	vcpuSeconds = operatormetrics.NewCounter(operatormetrics.MetricOpts{
-		Name: "kubevirt_vmi_vcpu_seconds_total",
-		Help: "Total amount of time spent in each state by each vcpu.",
+		Name:        "kubevirt_vmi_vcpu_seconds_total",
+		ExtraFields: groups.Tag(groups.VMIVCPU),
+		Help:        "Total amount of time spent in each state by each vcpu.",
 	})
 	vcpuWaitSeconds = operatormetrics.NewCounter(operatormetrics.MetricOpts{
-		Name: "kubevirt_vmi_vcpu_wait_seconds_total",
-		Help: "Amount of time spent by each vcpu while waiting on I/O.",
+		Name:        "kubevirt_vmi_vcpu_wait_seconds_total",
+		ExtraFields: groups.Tag(groups.VMIVCPU),
+		Help:        "Amount of time spent by each vcpu while waiting on I/O.",
 	})
 	vcpuDelaySeconds = operatormetrics.NewCounter(operatormetrics.MetricOpts{
-		Name: "kubevirt_vmi_vcpu_delay_seconds_total",
-		Help: "Amount of time spent by each vcpu waiting in the queue instead of running.",
+		Name:        "kubevirt_vmi_vcpu_delay_seconds_total",
+		ExtraFields: groups.Tag(groups.VMIVCPU),
+		Help:        "Amount of time spent by each vcpu waiting in the queue instead of running.",
 	})
 )
 

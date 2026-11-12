@@ -15,7 +15,7 @@
 # limitations under the License.
 
 export KUBEVIRT_PROVIDER=k8s-1.36
-export KUBEVIRT_COMMIT="${KUBEVIRT_COMMIT:-ed7b33d42a4a2424a3889b7a0d7e16460fe70119}"
+export KUBEVIRT_COMMIT="${KUBEVIRT_COMMIT:-69de3fcc847ae4a65faff3dcfce55ae433641060}"
 export KUBEVIRT_MEMORY_SIZE="${KUBEVIRT_MEMORY_SIZE:-9216M}"
 export KUBEVIRT_DEPLOY_NP=true
 export KUBEVIRT_DEPLOY_PROMETHEUS=true
@@ -32,8 +32,17 @@ function kubevirt::install() {
   if [[ ! -d ${_base_dir}/_kubevirt ]]; then
     git init --quiet "${_base_dir}/_kubevirt"
     git -C "${_base_dir}/_kubevirt" remote add origin https://github.com/kubevirt/kubevirt.git
-    git -C "${_base_dir}/_kubevirt" fetch --quiet --depth 1 origin "${KUBEVIRT_COMMIT}"
-    git -C "${_base_dir}/_kubevirt" checkout --quiet FETCH_HEAD
+  fi
+
+  # Re-fetch whenever the checkout is not already at KUBEVIRT_COMMIT
+  local head
+  head=$(git -C "${_base_dir}/_kubevirt" rev-parse HEAD 2>/dev/null || echo "")
+  if [[ ${head} != "${KUBEVIRT_COMMIT}" ]]; then
+    if ! git -C "${_base_dir}/_kubevirt" fetch --quiet --depth 1 origin "${KUBEVIRT_COMMIT}" ||
+      ! git -C "${_base_dir}/_kubevirt" checkout --quiet FETCH_HEAD; then
+      echo "ERROR: could not check out KUBEVIRT_COMMIT=${KUBEVIRT_COMMIT} in ${_base_dir}/_kubevirt" >&2
+      exit 1
+    fi
   fi
 }
 
@@ -61,6 +70,8 @@ function kubevirt::registry() {
 kubevirt::install
 
 case ${_action} in
+  "install")
+    ;;
   "up")
     kubevirt::up
     ;;
@@ -83,7 +94,7 @@ case ${_action} in
     ${_kubectl} "$@"
     ;;
   *)
-    echo "No command provided, known commands are 'up', 'down', 'sync', 'ssh', 'kubeconfig', 'registry', 'kubectl'"
+    echo "No command provided, known commands are 'install', 'up', 'down', 'sync', 'ssh', 'kubeconfig', 'registry', 'kubectl'"
     exit 1
     ;;
 esac

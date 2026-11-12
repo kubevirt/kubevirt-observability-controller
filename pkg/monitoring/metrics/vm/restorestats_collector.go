@@ -27,6 +27,7 @@ import (
 	"k8s.io/client-go/tools/cache"
 	snapshotv1 "kubevirt.io/api/snapshot/v1beta1"
 
+	"github.com/kubevirt/kubevirt-observability-controller/pkg/monitoring/groups"
 	"github.com/kubevirt/kubevirt-observability-controller/pkg/monitoring/metrics/internal/inventory"
 )
 
@@ -39,8 +40,9 @@ func NewVMRestoreStatsCollector(getStore func() cache.Store) operatormetrics.Col
 
 var vmRestoreInfo = operatormetrics.NewGaugeVec(
 	operatormetrics.MetricOpts{
-		Name: "kubevirt_vmrestore_info",
-		Help: "Information about VirtualMachineRestores.",
+		Name:        "kubevirt_vmrestore_info",
+		ExtraFields: groups.Tag(groups.Inventory),
+		Help:        "Information about VirtualMachineRestores.",
 	},
 	[]string{"namespace", "name", "uid", "vm", "snapshot_name", "complete", "failure"},
 )

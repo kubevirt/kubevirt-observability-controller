@@ -18,7 +18,11 @@ Copyright The KubeVirt Authors.
 
 package vmstats
 
-import "github.com/rhobs/operator-observability-toolkit/pkg/operatormetrics"
+import (
+	"github.com/rhobs/operator-observability-toolkit/pkg/operatormetrics"
+
+	"github.com/kubevirt/kubevirt-observability-controller/pkg/monitoring/groups"
+)
 
 var (
 	dirtyRateMetricsList = []operatormetrics.Metric{
@@ -26,8 +30,9 @@ var (
 	}
 
 	dirtyRateBytesPerSecond = operatormetrics.NewGauge(operatormetrics.MetricOpts{
-		Name: "kubevirt_vmi_dirty_rate_bytes_per_second",
-		Help: "Guest dirty-rate in bytes per second.",
+		Name:        "kubevirt_vmi_dirty_rate_bytes_per_second",
+		ExtraFields: groups.Tag(groups.VMIDirtyRate),
+		Help:        "Guest dirty-rate in bytes per second.",
 	})
 )
 

@@ -20,8 +20,18 @@ package recordingrules
 
 import "github.com/rhobs/operator-observability-toolkit/pkg/operatorrules"
 
-func Register(registry *operatorrules.Registry, namespace string, allowlist map[string]bool) error {
-	allRules := [][]operatorrules.RecordingRule{
+// All returns every recording rule the controller defines, in a stable order.
+// Group membership lives in each rule's MetricsOpts.ExtraFields.
+func All(namespace string) []operatorrules.RecordingRule {
+	var out []operatorrules.RecordingRule
+	for _, set := range sets(namespace) {
+		out = append(out, set...)
+	}
+	return out
+}
+
+func sets(namespace string) [][]operatorrules.RecordingRule {
+	return [][]operatorrules.RecordingRule{
 		apiRecordingRules,
 		nodesRecordingRules,
 		operatorRecordingRules,
@@ -31,6 +41,10 @@ func Register(registry *operatorrules.Registry, namespace string, allowlist map[
 		vmsnapshotRecordingRules,
 		deprecatedRecordingRules,
 	}
+}
+
+func Register(registry *operatorrules.Registry, namespace string, allowlist map[string]bool) error {
+	allRules := sets(namespace)
 
 	if allowlist != nil {
 		for i := range allRules {

@@ -18,8 +18,13 @@ Copyright The KubeVirt Authors.
 
 package vmstats
 
-import "github.com/rhobs/operator-observability-toolkit/pkg/operatormetrics"
+import (
+	"github.com/rhobs/operator-observability-toolkit/pkg/operatormetrics"
 
+	"github.com/kubevirt/kubevirt-observability-controller/pkg/monitoring/groups"
+)
+
+//nolint:dupl // parallel counter declarations, not shared logic
 var (
 	blockMetricsList = []operatormetrics.Metric{
 		storageIopsRead, storageIopsWrite,
@@ -29,36 +34,44 @@ var (
 	}
 
 	storageIopsRead = operatormetrics.NewCounter(operatormetrics.MetricOpts{
-		Name: "kubevirt_vmi_storage_iops_read_total",
-		Help: "Total number of I/O read operations.",
+		Name:        "kubevirt_vmi_storage_iops_read_total",
+		ExtraFields: groups.Tag(groups.VMIStorage),
+		Help:        "Total number of I/O read operations.",
 	})
 	storageIopsWrite = operatormetrics.NewCounter(operatormetrics.MetricOpts{
-		Name: "kubevirt_vmi_storage_iops_write_total",
-		Help: "Total number of I/O write operations.",
+		Name:        "kubevirt_vmi_storage_iops_write_total",
+		ExtraFields: groups.Tag(groups.VMIStorage),
+		Help:        "Total number of I/O write operations.",
 	})
 	storageReadTrafficBytes = operatormetrics.NewCounter(operatormetrics.MetricOpts{
-		Name: "kubevirt_vmi_storage_read_traffic_bytes_total",
-		Help: "Total number of bytes read from storage.",
+		Name:        "kubevirt_vmi_storage_read_traffic_bytes_total",
+		ExtraFields: groups.Tag(groups.VMIStorage),
+		Help:        "Total number of bytes read from storage.",
 	})
 	storageWriteTrafficBytes = operatormetrics.NewCounter(operatormetrics.MetricOpts{
-		Name: "kubevirt_vmi_storage_write_traffic_bytes_total",
-		Help: "Total number of written bytes.",
+		Name:        "kubevirt_vmi_storage_write_traffic_bytes_total",
+		ExtraFields: groups.Tag(groups.VMIStorage),
+		Help:        "Total number of written bytes.",
 	})
 	storageReadTimesSeconds = operatormetrics.NewCounter(operatormetrics.MetricOpts{
-		Name: "kubevirt_vmi_storage_read_times_seconds_total",
-		Help: "Total time spent on read operations.",
+		Name:        "kubevirt_vmi_storage_read_times_seconds_total",
+		ExtraFields: groups.Tag(groups.VMIStorage),
+		Help:        "Total time spent on read operations.",
 	})
 	storageWriteTimesSeconds = operatormetrics.NewCounter(operatormetrics.MetricOpts{
-		Name: "kubevirt_vmi_storage_write_times_seconds_total",
-		Help: "Total time spent on write operations.",
+		Name:        "kubevirt_vmi_storage_write_times_seconds_total",
+		ExtraFields: groups.Tag(groups.VMIStorage),
+		Help:        "Total time spent on write operations.",
 	})
 	storageFlushRequests = operatormetrics.NewCounter(operatormetrics.MetricOpts{
-		Name: "kubevirt_vmi_storage_flush_requests_total",
-		Help: "Total storage flush requests.",
+		Name:        "kubevirt_vmi_storage_flush_requests_total",
+		ExtraFields: groups.Tag(groups.VMIStorage),
+		Help:        "Total storage flush requests.",
 	})
 	storageFlushTimesSeconds = operatormetrics.NewCounter(operatormetrics.MetricOpts{
-		Name: "kubevirt_vmi_storage_flush_times_seconds_total",
-		Help: "Total time spent on cache flushing.",
+		Name:        "kubevirt_vmi_storage_flush_times_seconds_total",
+		ExtraFields: groups.Tag(groups.VMIStorage),
+		Help:        "Total time spent on cache flushing.",
 	})
 )
 

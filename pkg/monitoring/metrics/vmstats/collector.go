@@ -42,8 +42,10 @@ func RegisterCollector(cache *StatsCache, allowlist map[string]bool) error {
 	return operatormetrics.RegisterCollector(*filtered)
 }
 
-func vmStatsCollector(cache *StatsCache) operatormetrics.Collector {
-	allMetrics := slices.Concat(
+// AllMetrics returns every vmstats metric before filtering, so the selection
+// layer can read group membership without registering the collector.
+func AllMetrics() []operatormetrics.Metric {
+	return slices.Concat(
 		cpuMetricsList,
 		memoryMetricsList,
 		vcpuMetricsList,
@@ -52,9 +54,11 @@ func vmStatsCollector(cache *StatsCache) operatormetrics.Collector {
 		dirtyRateMetricsList,
 		guestMetricsList,
 	)
+}
 
+func vmStatsCollector(cache *StatsCache) operatormetrics.Collector {
 	return operatormetrics.Collector{
-		Metrics: allMetrics,
+		Metrics: AllMetrics(),
 		CollectCallback: func() []operatormetrics.CollectorResult {
 			entries := cache.List()
 			if len(entries) == 0 {

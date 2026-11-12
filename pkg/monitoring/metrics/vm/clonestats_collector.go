@@ -23,6 +23,7 @@ import (
 	"k8s.io/client-go/tools/cache"
 	clonev1 "kubevirt.io/api/clone/v1beta1"
 
+	"github.com/kubevirt/kubevirt-observability-controller/pkg/monitoring/groups"
 	"github.com/kubevirt/kubevirt-observability-controller/pkg/monitoring/metrics/internal/inventory"
 )
 
@@ -37,8 +38,9 @@ func NewVMCloneStatsCollector(getStore func() cache.Store) operatormetrics.Colle
 var (
 	vmCloneInfo = operatormetrics.NewGaugeVec(
 		operatormetrics.MetricOpts{
-			Name: "kubevirt_vmclone_info",
-			Help: "Information about VirtualMachineClones.",
+			Name:        "kubevirt_vmclone_info",
+			ExtraFields: groups.Tag(groups.Inventory),
+			Help:        "Information about VirtualMachineClones.",
 		},
 		[]string{
 			"namespace", "name", "uid", "source", "source_kind", "target_vm",
@@ -48,8 +50,9 @@ var (
 
 	vmCloneCreationTimestamp = operatormetrics.NewGaugeVec(
 		operatormetrics.MetricOpts{
-			Name: "kubevirt_vmclone_create_date_timestamp_seconds",
-			Help: "Virtual Machine Clone creation timestamp.",
+			Name:        "kubevirt_vmclone_create_date_timestamp_seconds",
+			ExtraFields: groups.Tag(groups.Inventory),
+			Help:        "Virtual Machine Clone creation timestamp.",
 		},
 		[]string{"namespace", "name"},
 	)

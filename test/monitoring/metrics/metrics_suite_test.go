@@ -41,6 +41,17 @@ func TestMetrics(t *testing.T) {
 	RunSpecs(t, "Metrics E2E Suite")
 }
 
+// baselineArgs is the deployment most specs in this suite expect: every group
+// selected. Passing no allowlist would select only the groups KubeVirt does
+// not publish, which is a deliberately narrow set — specs asserting on a
+// particular metric have to ask for it. Only the group-selection specs care
+// what the default is, and they pass their own flags.
+var baselineArgs = []string{
+	"--enable-vmstats",
+	"--vmstats-cert-path=/etc/monitoring/clientcertificates",
+	"--metrics-allowlist=all",
+}
+
 var _ = BeforeSuite(func() {
 	image = os.Getenv("IMG")
 	Expect(image).ToNot(BeEmpty(), "IMG env var must be set")
@@ -54,9 +65,7 @@ var _ = BeforeSuite(func() {
 	kvNamespace, err = lib.FindKubeVirtNamespace()
 	Expect(err).ToNot(HaveOccurred())
 
-	err = lib.DeployController(kvNamespace, image,
-		"--enable-vmstats",
-		"--vmstats-cert-path=/etc/monitoring/clientcertificates")
+	err = lib.DeployController(kvNamespace, image, baselineArgs...)
 	Expect(err).ToNot(HaveOccurred())
 	DeferCleanup(lib.DeleteController, kvNamespace)
 

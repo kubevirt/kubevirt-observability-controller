@@ -22,12 +22,15 @@ import (
 	"github.com/rhobs/operator-observability-toolkit/pkg/operatormetrics"
 	"github.com/rhobs/operator-observability-toolkit/pkg/operatorrules"
 	"k8s.io/apimachinery/pkg/util/intstr"
+
+	"github.com/kubevirt/kubevirt-observability-controller/pkg/monitoring/groups"
 )
 
 var vmiRecordingRules = []operatorrules.RecordingRule{
 	{
 		MetricsOpts: operatormetrics.MetricOpts{
-			Name: "node:kubevirt_vmi_phase:sum",
+			Name:        "node:kubevirt_vmi_phase:sum",
+			ExtraFields: groups.Tag(groups.VMIStatus),
 			Help: "Sum of VMIs per phase and node. `phase` can be one of the following: " +
 				"[`Pending`, `Scheduling`, `Scheduled`, `Running`, `Succeeded`, `Failed`, `Unknown`].",
 		},
@@ -41,24 +44,27 @@ var vmiRecordingRules = []operatorrules.RecordingRule{
 	},
 	{
 		MetricsOpts: operatormetrics.MetricOpts{
-			Name: "vmi:kubevirt_vmi_memory_used_bytes:sum",
-			Help: "Amount of `used` memory as seen by the domain.",
+			Name:        "vmi:kubevirt_vmi_memory_used_bytes:sum",
+			ExtraFields: groups.Tag(groups.VMIMemory),
+			Help:        "Amount of `used` memory as seen by the domain.",
 		},
 		MetricType: operatormetrics.GaugeType,
 		Expr:       intstr.FromString("kubevirt_vmi_memory_available_bytes-kubevirt_vmi_memory_usable_bytes"),
 	},
 	{
 		MetricsOpts: operatormetrics.MetricOpts{
-			Name: "vmi:kubevirt_vmi_vcpu:count",
-			Help: "The number of the VMI vCPUs.",
+			Name:        "vmi:kubevirt_vmi_vcpu:count",
+			ExtraFields: groups.Tag(groups.VMIVCPU),
+			Help:        "The number of the VMI vCPUs.",
 		},
 		MetricType: operatormetrics.GaugeType,
 		Expr:       intstr.FromString("count by (namespace, name, node) (kubevirt_vmi_vcpu_seconds_total)"),
 	},
 	{
 		MetricsOpts: operatormetrics.MetricOpts{
-			Name: "vmi:kubevirt_vmi_guest_queue_length:sum",
-			Help: "Guest queue length.",
+			Name:        "vmi:kubevirt_vmi_guest_queue_length:sum",
+			ExtraFields: groups.Tag(groups.VMICPU),
+			Help:        "Guest queue length.",
 		},
 		MetricType: operatormetrics.GaugeType,
 		Expr: intstr.FromString(
@@ -67,8 +73,9 @@ var vmiRecordingRules = []operatorrules.RecordingRule{
 	},
 	{
 		MetricsOpts: operatormetrics.MetricOpts{
-			Name: "vmi:kubevirt_vmi_memory_headroom_ratio:sum",
-			Help: "Usable memory to available memory ratio per VMI (aggregated by name, namespace).",
+			Name:        "vmi:kubevirt_vmi_memory_headroom_ratio:sum",
+			ExtraFields: groups.Tag(groups.VMIMemory),
+			Help:        "Usable memory to available memory ratio per VMI (aggregated by name, namespace).",
 		},
 		MetricType: operatormetrics.GaugeType,
 		Expr: intstr.FromString(
@@ -78,16 +85,19 @@ var vmiRecordingRules = []operatorrules.RecordingRule{
 	},
 	{
 		MetricsOpts: operatormetrics.MetricOpts{
-			Name: "vmi:kubevirt_vmi_pgmajfaults:rate5m",
-			Help: "Rate of major page faults over 5 minutes per VMI (aggregated by name, namespace).",
+			Name:        "vmi:kubevirt_vmi_pgmajfaults:rate5m",
+			ExtraFields: groups.Tag(groups.VMIMemory),
+			Help:        "Rate of major page faults over 5 minutes per VMI (aggregated by name, namespace).",
 		},
 		MetricType: operatormetrics.GaugeType,
 		Expr:       intstr.FromString("sum by (name, namespace) (rate(kubevirt_vmi_memory_pgmajfault_total[5m]))"),
 	},
 	{
 		MetricsOpts: operatormetrics.MetricOpts{
-			Name: "vmi:kubevirt_vmi_swap_traffic_bytes:rate5m",
-			Help: "Total swap I/O traffic rate over 5 minutes per VMI (swap in + swap out, aggregated by name, namespace).",
+			Name:        "vmi:kubevirt_vmi_swap_traffic_bytes:rate5m",
+			ExtraFields: groups.Tag(groups.VMIMemory),
+			Help: "Total swap I/O traffic rate over 5 minutes per VMI " +
+				"(swap in + swap out, aggregated by name, namespace).",
 		},
 		MetricType: operatormetrics.GaugeType,
 		Expr: intstr.FromString(
@@ -97,24 +107,28 @@ var vmiRecordingRules = []operatorrules.RecordingRule{
 	},
 	{
 		MetricsOpts: operatormetrics.MetricOpts{
-			Name: "vmi:kubevirt_vmi_memory_available_bytes:sum",
-			Help: "Sum of available memory bytes per VMI (aggregated by name, namespace).",
+			Name:        "vmi:kubevirt_vmi_memory_available_bytes:sum",
+			ExtraFields: groups.Tag(groups.VMIMemory),
+			Help:        "Sum of available memory bytes per VMI (aggregated by name, namespace).",
 		},
 		MetricType: operatormetrics.GaugeType,
 		Expr:       intstr.FromString("sum by (name, namespace) (kubevirt_vmi_memory_available_bytes)"),
 	},
 	{
 		MetricsOpts: operatormetrics.MetricOpts{
-			Name: "vmi:kubevirt_vmi_pgmajfaults:rate30m",
-			Help: "Rate of major page faults over 30 minutes per VMI (aggregated by name, namespace).",
+			Name:        "vmi:kubevirt_vmi_pgmajfaults:rate30m",
+			ExtraFields: groups.Tag(groups.VMIMemory),
+			Help:        "Rate of major page faults over 30 minutes per VMI (aggregated by name, namespace).",
 		},
 		MetricType: operatormetrics.GaugeType,
 		Expr:       intstr.FromString("sum by (name, namespace) (rate(kubevirt_vmi_memory_pgmajfault_total[30m]))"),
 	},
 	{
 		MetricsOpts: operatormetrics.MetricOpts{
-			Name: "vmi:kubevirt_vmi_swap_traffic_bytes:rate30m",
-			Help: "Total swap I/O traffic rate over 30 minutes per VMI (swap in + swap out, aggregated by name, namespace).",
+			Name:        "vmi:kubevirt_vmi_swap_traffic_bytes:rate30m",
+			ExtraFields: groups.Tag(groups.VMIMemory),
+			Help: "Total swap I/O traffic rate over 30 minutes per VMI " +
+				"(swap in + swap out, aggregated by name, namespace).",
 		},
 		MetricType: operatormetrics.GaugeType,
 		Expr: intstr.FromString(
@@ -124,7 +138,8 @@ var vmiRecordingRules = []operatorrules.RecordingRule{
 	},
 	{
 		MetricsOpts: operatormetrics.MetricOpts{
-			Name: "vmi:kubevirt_vmi_guest_device_driver_timestamp_seconds:max",
+			Name:        "vmi:kubevirt_vmi_guest_device_driver_timestamp_seconds:max",
+			ExtraFields: groups.Tag(groups.GuestDrivers),
 			Help: "One series per outdated (VMI, device) pair: the installed guest device driver version does not " +
 				"match the latest version known for that device and guest OS version.",
 		},
