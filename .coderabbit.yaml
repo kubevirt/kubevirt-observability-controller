@@ -80,7 +80,10 @@ reviews:
         - Metric names use the kubevirt_ prefix and follow the KubeVirt monitoring
           guidelines (kubevirt/monitoring).
         - Avoid unbounded label cardinality: no per-object values such as VM names,
-          UUIDs, or namespace+name pairs as labels.
+          UUIDs, or namespace+name pairs as labels. Exception: per-VMI metrics
+          that mirror upstream KubeVirt and join with kubevirt_vmi_info may use
+          the node, namespace, and name labels; their series count is bounded
+          by the VMI count, same as kubevirt_vmi_info and the guest info metrics.
         - New metrics must be reflected in docs/metrics.md (regenerate with
           `go run ./hack/gen-metrics-docs`) and pass the metric-name linter
           (hack/prom-metric-linter).
