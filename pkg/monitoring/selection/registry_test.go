@@ -113,6 +113,7 @@ var _ = Describe("Default selection", func() {
 			"kubevirt_guest_device_driver_latest_version_info",
 			"kubevirt_guest_device_driver_config_invalid",
 			// guest-agent
+			"kubevirt_vmi_guest_agent_connected",
 			"kubevirt_vmi_guest_hostname",
 			"kubevirt_vmi_guest_timezone",
 			"kubevirt_vmi_guest_user_count",
@@ -162,7 +163,7 @@ var _ = Describe("ForFlags", func() {
 		sel, err := selection.ForFlags(testNamespace, "", "", "", groups.GroupDefaults)
 		Expect(err).ToNot(HaveOccurred())
 
-		Expect(sel.Metrics).To(HaveLen(23))
+		Expect(sel.Metrics).To(HaveLen(24))
 		Expect(sel.RecordingRules).To(HaveLen(1))
 		Expect(sel.Alerts).To(HaveLen(3))
 		Expect(sel.Empty).To(BeEmpty())
@@ -222,7 +223,7 @@ var _ = Describe("ForFlags with EveryGroup rule defaulting", func() {
 		sel, err := selection.ForFlags(testNamespace, "", "", "", groups.EveryGroup)
 		Expect(err).ToNot(HaveOccurred())
 
-		Expect(sel.Metrics).To(HaveLen(23))
+		Expect(sel.Metrics).To(HaveLen(24))
 		Expect(sel.Metrics).ToNot(HaveKey("kubevirt_vmi_memory_resident_bytes"))
 	})
 

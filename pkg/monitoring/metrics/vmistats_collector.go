@@ -19,6 +19,7 @@ Copyright The KubeVirt Authors.
 package metrics
 
 import (
+	"slices"
 	"strconv"
 	"strings"
 
@@ -30,6 +31,8 @@ import (
 	"github.com/kubevirt/kubevirt-observability-controller/pkg/monitoring/groups"
 
 	k6tv1 "kubevirt.io/api/core/v1"
+
+	"github.com/kubevirt/kubevirt-observability-controller/pkg/monitoring/metrics/internal/inventory"
 )
 
 // Interface info source reported in VirtualMachineInstanceNetworkInterface,
@@ -48,6 +51,7 @@ var (
 			vmiEphemeralHotplugVolume,
 			vmiGuestOSInfo,
 			vmiGuestInterfaceInfo,
+			vmiGuestAgentConnected,
 		},
 		CollectCallback: vmiStatsCollectorCallback,
 	}
@@ -166,6 +170,16 @@ var (
 			"interface_name", "network_name", "mac", "ip_address",
 		},
 	)
+
+	vmiGuestAgentConnected = operatormetrics.NewGaugeVec(
+		operatormetrics.MetricOpts{
+			Name:        "kubevirt_vmi_guest_agent_connected",
+			ExtraFields: groups.Tag(groups.GuestAgent),
+			Help: "Whether the QEMU guest agent is connected to the VMI, " +
+				"from the AgentConnected condition in the VMI status.",
+		},
+		[]string{"node", "namespace", "name"},
+	)
 )
 
 func vmiStatsCollectorCallback() []operatormetrics.CollectorResult {
@@ -200,6 +214,7 @@ func ReportVMIsStats(
 		crs = append(crs, collectVMILauncherMemoryOverhead(vmi))
 		crs = append(crs, collectVMIGuestOSInfo(vmi)...)
 		crs = append(crs, collectVMIGuestInterfaces(vmi)...)
+		crs = append(crs, collectVMIGuestAgentConnected(vmi))
 	}
 
 	return crs
@@ -416,6 +431,27 @@ func guestAgentReported(infoSource string) bool {
 	}
 
 	return false
+}
+
+func collectVMIGuestAgentConnected(
+	vmi *k6tv1.VirtualMachineInstance,
+) operatormetrics.CollectorResult {
+	return operatormetrics.CollectorResult{
+		Metric: vmiGuestAgentConnected,
+		Labels: []string{vmi.Status.NodeName, vmi.Namespace, vmi.Name},
+		Value:  inventory.BoolGaugeValue(isGuestAgentConnected(vmi)),
+	}
+}
+
+// isGuestAgentConnected reports whether the VMI carries the
+// AgentConnected condition with status True. virt-handler removes the
+// condition when the agent channel disconnects, so a VMI without the
+// condition has no connected agent.
+func isGuestAgentConnected(vmi *k6tv1.VirtualMachineInstance) bool {
+	return slices.ContainsFunc(vmi.Status.Conditions, func(condition k6tv1.VirtualMachineInstanceCondition) bool {
+		return condition.Type == k6tv1.VirtualMachineInstanceAgentConnected &&
+			condition.Status == k8sv1.ConditionTrue
+	})
 }
 
 func CollectVMIMigrationTime(

@@ -87,4 +87,22 @@ var _ = Describe("Custom Metrics", func() {
 				"interface series should carry the network name from status.interfaces")
 		}
 	})
+
+	It("should expose the guest agent connection state for the test VMI", func() {
+		Eventually(func(g Gomega) {
+			var err error
+			metricsOutput, err = metrics.Scrape(kvNamespace, metricsServiceName)
+			g.Expect(err).ToNot(HaveOccurred())
+			lines := metrics.FindMetricWithLabels(metricsOutput,
+				"kubevirt_vmi_guest_agent_connected",
+				map[string]string{
+					"name":      "e2e-test-vmi",
+					"namespace": testVMINamespace,
+				})
+			g.Expect(lines).ToNot(BeEmpty(),
+				"kubevirt_vmi_guest_agent_connected for e2e-test-vmi not found")
+			g.Expect(lines[0].Value).To(Equal("1"),
+				"the test VMI guest agent should be connected")
+		}, 5*time.Minute, 10*time.Second).Should(Succeed())
+	})
 })

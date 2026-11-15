@@ -24,6 +24,7 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
+	k8sv1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -304,6 +305,49 @@ var _ = Describe("VMI Stats Collector", func() {
 			Expect(collectVMIGuestInterfaces(vmi)).To(BeEmpty())
 		})
 	})
+
+	DescribeTable("collectVMIGuestAgentConnected",
+		func(conditions []k6tv1.VirtualMachineInstanceCondition, expectedValue float64) {
+			vmi := &k6tv1.VirtualMachineInstance{
+				ObjectMeta: metav1.ObjectMeta{Name: "vmi1", Namespace: "ns1"},
+				Status: k6tv1.VirtualMachineInstanceStatus{
+					NodeName:   "node1",
+					Conditions: conditions,
+				},
+			}
+
+			result := collectVMIGuestAgentConnected(vmi)
+
+			Expect(result.Metric.GetOpts().Name).
+				To(Equal("kubevirt_vmi_guest_agent_connected"))
+			Expect(result.Value).To(Equal(expectedValue))
+			Expect(result.Labels).To(Equal([]string{"node1", "ns1", "vmi1"}))
+		},
+		Entry("should report 1 when the AgentConnected condition is True",
+			[]k6tv1.VirtualMachineInstanceCondition{
+				{
+					Type:   k6tv1.VirtualMachineInstanceAgentConnected,
+					Status: k8sv1.ConditionTrue,
+				},
+			},
+			1.0),
+		Entry("should report 0 when the VMI has no AgentConnected condition",
+			[]k6tv1.VirtualMachineInstanceCondition{
+				{
+					Type:   k6tv1.VirtualMachineInstanceReady,
+					Status: k8sv1.ConditionTrue,
+				},
+			},
+			0.0),
+		Entry("should report 0 when the AgentConnected condition is not True",
+			[]k6tv1.VirtualMachineInstanceCondition{
+				{
+					Type:   k6tv1.VirtualMachineInstanceAgentConnected,
+					Status: k8sv1.ConditionFalse,
+				},
+			},
+			0.0),
+	)
 
 	Describe("CollectVMIsVnicInfo", func() {
 		newVMIWithInterfaces := func(

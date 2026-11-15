@@ -27,6 +27,7 @@
 | kubevirt_vmi_dirty_rate_bytes_per_second | `vmi-dirty-rate` | Metric | Gauge | Guest dirty-rate in bytes per second. |
 | kubevirt_vmi_filesystem_capacity_bytes | `guest-filesystem` | Metric | Gauge | Total VM filesystem capacity in bytes. |
 | kubevirt_vmi_filesystem_used_bytes | `guest-filesystem` | Metric | Gauge | Used VM filesystem capacity in bytes. |
+| kubevirt_vmi_guest_agent_connected | `guest-agent` | Metric | Gauge | Whether the QEMU guest agent is connected to the VMI, from the AgentConnected condition in the VMI status. |
 | kubevirt_vmi_guest_device_driver_timestamp_seconds | `guest-drivers` | Metric | Gauge | Release date of the driver of a guest device, in seconds since the epoch, as reported by the guest agent. Windows guests only. |
 | kubevirt_vmi_guest_hostname | `guest-agent` | Metric | Gauge | Guest hostname from the guest agent. |
 | kubevirt_vmi_guest_interface_info | `vmi-interfaces` | Metric | Gauge | Network interface information reported by the guest agent in the VMI status. |
