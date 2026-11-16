@@ -100,7 +100,7 @@ make build
 ### Run Tests
 
 ```sh
-make test        # unit tests, Go rule linters, and localized promtool tests
+make test        # unit tests, Go rule linters, localized promtool tests, group defaults
 make check       # all unit/rule tests plus the metric-name linter
 make test-e2e    # end-to-end tests (requires kubevirtci cluster)
 ```
@@ -119,6 +119,12 @@ make prom-rules-verify # alias for test-rules
 To use an existing executable, set `PROMTOOL=/absolute/path/to/promtool`.
 `make check` also runs `lint-metrics`, which needs `docker` or `podman`
 (`CONTAINER_TOOL`, default `docker`).
+
+`make test` also includes `verify-origins`, which checks every group's `Default`
+flag against the KubeVirt release `hack/kubevirt.sh` pins. It clones that
+checkout into `_kubevirt/` first; the test skips without one, so run it through
+the target rather than as a bare `go test`. Point it at an existing clone with
+`KUBEVIRT_DIR=/path/to/kubevirt go test ./test/origins/`.
 
 Place rule fixtures beside their definitions under `pkg/monitoring/rules/`,
 using the suffix `_test.promtool.yml` and `rule_files: [rules.yaml]`.

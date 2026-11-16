@@ -114,11 +114,11 @@ vet: ## Run go vet against code.
 	go vet ./...
 
 .PHONY: test
-test: manifests generate fmt goimports-check vet setup-envtest test-rules ## Run tests.
+test: manifests generate fmt goimports-check vet setup-envtest test-rules verify-origins ## Run tests.
 	KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) --bin-dir $(LOCALBIN) -p path)" go test $$(go list ./... | grep -v /e2e | grep -v /test/ | grep -v /cmd) -coverprofile cover.out
 
 .PHONY: check
-check: test lint-metrics verify-origins ## Run unit tests plus metric-name, promtool, and group-default checks.
+check: test lint-metrics ## Run unit tests plus the metric-name linter.
 
 .PHONY: verify-origins
 verify-origins: ## Check group defaults against the pinned KubeVirt checkout.
