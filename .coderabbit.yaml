@@ -84,6 +84,9 @@ reviews:
           that mirror upstream KubeVirt and join with kubevirt_vmi_info may use
           the node, namespace, and name labels; their series count is bounded
           by the VMI count, same as kubevirt_vmi_info and the guest info metrics.
+          Inventory metrics (kubevirt_*_info for snapshots, restores, exports,
+          clones, pools, and NADs) may use namespace and name labels; series are
+          bounded by the object count.
         - New metrics must be reflected in docs/metrics.md (regenerate with
           `go run ./hack/gen-metrics-docs`) and pass the metric-name linter
           (hack/prom-metric-linter).
