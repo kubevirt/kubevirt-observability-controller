@@ -106,7 +106,14 @@ type Selection struct {
 }
 
 // ForFlags resolves the three allowlist values against the definitions.
-func ForFlags(namespace, metricsRaw, recordingRulesRaw, alertsRaw string) (Selection, error) {
+//
+// ruleDefaulting applies to the two rule flags only. KubeVirt exports its own
+// metrics whatever else is true, so the metrics flag always defaults to the
+// groups KubeVirt does not publish.
+func ForFlags(
+	namespace, metricsRaw, recordingRulesRaw, alertsRaw string,
+	ruleDefaulting groups.Defaulting,
+) (Selection, error) {
 	index, err := BuildIndexes(namespace)
 	if err != nil {
 		return Selection{}, err
@@ -115,16 +122,17 @@ func ForFlags(namespace, metricsRaw, recordingRulesRaw, alertsRaw string) (Selec
 	sel := Selection{Empty: map[string][]string{}}
 
 	for _, f := range []struct {
-		name   string
-		raw    string
-		index  map[string]groups.Name
-		target *map[string]bool
+		name       string
+		raw        string
+		index      map[string]groups.Name
+		defaulting groups.Defaulting
+		target     *map[string]bool
 	}{
-		{MetricsFlag, metricsRaw, index.Metrics, &sel.Metrics},
-		{RecordingRulesFlag, recordingRulesRaw, index.RecordingRules, &sel.RecordingRules},
-		{AlertsFlag, alertsRaw, index.Alerts, &sel.Alerts},
+		{MetricsFlag, metricsRaw, index.Metrics, groups.GroupDefaults, &sel.Metrics},
+		{RecordingRulesFlag, recordingRulesRaw, index.RecordingRules, ruleDefaulting, &sel.RecordingRules},
+		{AlertsFlag, alertsRaw, index.Alerts, ruleDefaulting, &sel.Alerts},
 	} {
-		resolved, empty, resolveErr := groups.Resolve(f.index, f.raw)
+		resolved, empty, resolveErr := groups.Resolve(f.index, f.raw, f.defaulting)
 		if resolveErr != nil {
 			return Selection{}, fmt.Errorf("%s: %w", f.name, resolveErr)
 		}

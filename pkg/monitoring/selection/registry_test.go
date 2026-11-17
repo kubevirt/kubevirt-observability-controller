@@ -48,7 +48,7 @@ func recordingRuleIndex() map[string]groups.Name { return indexes().RecordingRul
 func alertIndex() map[string]groups.Name         { return indexes().Alerts }
 
 func selected(index map[string]groups.Name, raw string) []string {
-	got, _, err := groups.Resolve(index, raw)
+	got, _, err := groups.Resolve(index, raw, groups.GroupDefaults)
 	Expect(err).ToNot(HaveOccurred())
 
 	out := make([]string, 0, len(got))
@@ -159,7 +159,7 @@ var _ = Describe("Default selection", func() {
 // flags and the definitions, which was unreachable while it lived in cmd.
 var _ = Describe("ForFlags", func() {
 	It("resolves the default selection across all three types", func() {
-		sel, err := selection.ForFlags(testNamespace, "", "", "")
+		sel, err := selection.ForFlags(testNamespace, "", "", "", groups.GroupDefaults)
 		Expect(err).ToNot(HaveOccurred())
 
 		Expect(sel.Metrics).To(HaveLen(23))
@@ -177,7 +177,7 @@ var _ = Describe("ForFlags", func() {
 	})
 
 	It("applies each flag to its own artifact type", func() {
-		sel, err := selection.ForFlags(testNamespace, "all", "none", "virt-api")
+		sel, err := selection.ForFlags(testNamespace, "all", "none", "virt-api", groups.GroupDefaults)
 		Expect(err).ToNot(HaveOccurred())
 
 		Expect(len(sel.Metrics)).To(BeNumerically(">", 23))
@@ -186,7 +186,7 @@ var _ = Describe("ForFlags", func() {
 	})
 
 	It("names the flag that rejected an entry", func() {
-		_, err := selection.ForFlags(testNamespace, "", "", "no-such-group")
+		_, err := selection.ForFlags(testNamespace, "", "", "no-such-group", groups.GroupDefaults)
 		Expect(err).To(MatchError(ContainSubstring(selection.AlertsFlag)))
 		Expect(err).To(MatchError(ContainSubstring("no-such-group")))
 	})
@@ -195,9 +195,42 @@ var _ = Describe("ForFlags", func() {
 	// vocabulary, so this is legal and has to be reported rather than looking
 	// like an empty selection.
 	It("reports a group with no items of the flag's type", func() {
-		sel, err := selection.ForFlags(testNamespace, "", "", "inventory")
+		sel, err := selection.ForFlags(testNamespace, "", "", "inventory", groups.GroupDefaults)
 		Expect(err).ToNot(HaveOccurred())
 		Expect(sel.Alerts).To(BeEmpty())
 		Expect(sel.Empty).To(HaveKeyWithValue(selection.AlertsFlag, ConsistOf("inventory")))
+	})
+})
+
+// With the VMStatsCollector feature gate on, virt-operator does not publish
+// prometheus-kubevirt-rules at all, so the groups that exist to avoid
+// duplicating it would otherwise be published by nobody.
+var _ = Describe("ForFlags with EveryGroup rule defaulting", func() {
+	It("defaults the rules to every group", func() {
+		sel, err := selection.ForFlags(testNamespace, "", "", "", groups.EveryGroup)
+		Expect(err).ToNot(HaveOccurred())
+
+		Expect(sel.RecordingRules).To(HaveLen(len(recordingRuleIndex())))
+		Expect(sel.Alerts).To(HaveLen(len(alertIndex())))
+		Expect(sel.Alerts).To(HaveKey("VirtAPIDown"))
+		Expect(sel.RecordingRules).To(HaveKey("cluster:kubevirt_virt_api_up:sum"))
+	})
+
+	// The gate stops the PrometheusRule, not virt-handler's exporter, so
+	// widening the metrics too would double-publish every series.
+	It("leaves the metrics defaulting untouched", func() {
+		sel, err := selection.ForFlags(testNamespace, "", "", "", groups.EveryGroup)
+		Expect(err).ToNot(HaveOccurred())
+
+		Expect(sel.Metrics).To(HaveLen(23))
+		Expect(sel.Metrics).ToNot(HaveKey("kubevirt_vmi_memory_resident_bytes"))
+	})
+
+	It("still honours an explicit rule allowlist", func() {
+		sel, err := selection.ForFlags(testNamespace, "", "none", "virt-api", groups.EveryGroup)
+		Expect(err).ToNot(HaveOccurred())
+
+		Expect(sel.RecordingRules).To(BeEmpty())
+		Expect(sel.Alerts).To(HaveLen(4))
 	})
 })

@@ -59,6 +59,14 @@ The `virt-*` control plane rules, VM and VMI status metrics, and the libvirt
 domain stats that mirror KubeVirt are off by default. See
 [docs/metrics.md](docs/metrics.md#groups) for the full group listing.
 
+One exception: with `--enable-vmstats`, the alert and recording rule defaults
+widen to every group. That flag requires KubeVirt's `VMStatsCollector` feature
+gate, which also makes virt-operator stop publishing `prometheus-kubevirt-rules`
+— so there is no longer anything to duplicate, and the narrow default would
+leave those rules published by nobody. Metric defaults are unchanged, since
+virt-handler keeps exporting its own metrics either way. See
+[docs/deployment.md](docs/deployment.md#the-default-set-with---enable-vmstats).
+
 ### Changing the selection
 
 ```sh

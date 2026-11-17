@@ -94,6 +94,24 @@ The three allowlist flags share one grammar:
 | `a,b` | Exactly the contents of `a` and `b` |
 | `+a,-b` | The default set, plus `a`, minus `b` |
 
+#### The default set with `--enable-vmstats`
+
+What KubeVirt publishes is not fixed, so neither is the default set. With
+`--enable-vmstats`, `--alerts-allowlist=""` and
+`--recording-rules-allowlist=""` select **every** group rather than only the
+groups above.
+
+`--enable-vmstats` requires KubeVirt's `VMStatsCollector` feature gate, since
+virt-handler answers `/v1/vmstats` with 403 without it. That same gate makes
+virt-operator skip the `prometheus-kubevirt-rules` PrometheusRule entirely, and
+delete it if it already exists. So in this configuration KubeVirt publishes no
+alerts and no recording rules, and there is nothing left to duplicate: holding
+the narrow default would leave `VirtAPIDown` and the rest published by nobody.
+
+`--metrics-allowlist` is unaffected. The gate stops the PrometheusRule, not
+virt-handler's exporter, so KubeVirt keeps publishing its own metrics and
+widening the metrics default would duplicate them.
+
 Each entry is either a group name or an individual item name, so
 `--metrics-allowlist=guest-drivers` and
 `--metrics-allowlist=kubevirt_vmi_guest_device_driver_timestamp_seconds` are

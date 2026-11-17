@@ -68,13 +68,22 @@ type Group struct {
 	Name        Name
 	Description string
 
-	// Default reports whether the group is enabled when no flag selects it.
+	// Default reports whether the group is enabled when no flag selects it
+	// and the flag resolves under GroupDefaults.
 	//
 	// Set it to true if, and only if, KubeVirt does not itself publish the
 	// group's contents. Running alongside KubeVirt must not double-publish a
 	// series, so a group that mirrors upstream defaults to off. Check a new
 	// group's contents against the KubeVirt release this tracks before
 	// setting it.
+	//
+	// This field cannot answer the question on its own for every artifact
+	// type, because what KubeVirt publishes depends on its configuration:
+	// virt-operator stops publishing the prometheus-kubevirt-rules
+	// PrometheusRule when the VMStatsCollector feature gate is on, while
+	// virt-handler exports its metrics either way. The rule flags therefore
+	// resolve under EveryGroup in that configuration, which ignores this
+	// field. See Defaulting.
 	Default bool
 }
 
@@ -209,7 +218,8 @@ func Tag(n Name) map[string]string {
 	return map[string]string{Key: string(n)}
 }
 
-// Defaults returns the groups enabled when no flag selects otherwise.
+// Defaults returns the groups enabled when no flag selects otherwise and the
+// flag resolves under GroupDefaults.
 func Defaults() []Group {
 	var out []Group
 	for _, g := range All {

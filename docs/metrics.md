@@ -150,6 +150,12 @@ Metrics, recording rules, and alerts are selected by group. Groups marked
 ones KubeVirt does not publish itself. See
 [deployment.md](deployment.md#selecting-what-to-expose) for the flag grammar.
 
+The Default column below is the metrics default, and the rules default when
+KubeVirt is publishing its own PrometheusRule. With `--enable-vmstats` it
+no longer is, and the alert and recording rule defaults widen to every group;
+see
+[deployment.md](deployment.md#the-default-set-with---enable-vmstats).
+
 | Group | Default | Description |
 |-------|---------|-------------|
 | `virt-api` | off | virt-api availability, REST errors, and deprecated API usage |

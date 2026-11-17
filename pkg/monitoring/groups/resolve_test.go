@@ -19,6 +19,8 @@ Copyright The KubeVirt Authors.
 package groups
 
 import (
+	"maps"
+	"slices"
 	"testing"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -42,7 +44,7 @@ var index = map[string]Name{
 var _ = Describe("Resolve", func() {
 	DescribeTable("accepts",
 		func(raw string, expected []string) {
-			got, _, err := Resolve(index, raw)
+			got, _, err := Resolve(index, raw, GroupDefaults)
 			Expect(err).ToNot(HaveOccurred())
 
 			names := make([]string, 0, len(got))
@@ -92,7 +94,7 @@ var _ = Describe("Resolve", func() {
 
 	DescribeTable("rejects",
 		func(raw, because string) {
-			_, _, err := Resolve(index, raw)
+			_, _, err := Resolve(index, raw, GroupDefaults)
 			Expect(err).To(MatchError(ContainSubstring(because)))
 		},
 		Entry("an unknown name", "nonsense", "neither a known group nor a known name"),
@@ -109,12 +111,12 @@ var _ = Describe("Resolve", func() {
 	)
 
 	It("suggests the intended name when the case is wrong", func() {
-		_, _, err := Resolve(index, "KUBEVIRT_VMI_GUEST_LOAD_1M")
+		_, _, err := Resolve(index, "KUBEVIRT_VMI_GUEST_LOAD_1M", GroupDefaults)
 		Expect(err).To(MatchError(ContainSubstring(`did you mean "kubevirt_vmi_guest_load_1m"`)))
 	})
 
 	It("does not let a delta resurrect an item removed earlier in the list", func() {
-		got, _, err := Resolve(index, "+kubevirt_vmi_guest_load_1m,-kubevirt_vmi_guest_load_1m")
+		got, _, err := Resolve(index, "+kubevirt_vmi_guest_load_1m,-kubevirt_vmi_guest_load_1m", GroupDefaults)
 		Expect(err).ToNot(HaveOccurred())
 		Expect(got).ToNot(HaveKey("kubevirt_vmi_guest_load_1m"))
 	})
@@ -123,15 +125,49 @@ var _ = Describe("Resolve", func() {
 	// this artifact type has to be accepted. Reporting it separates that from
 	// the typo case, which errors.
 	It("reports a known group that has no items of this kind", func() {
-		got, empty, err := Resolve(index, "inventory")
+		got, empty, err := Resolve(index, "inventory", GroupDefaults)
 		Expect(err).ToNot(HaveOccurred())
 		Expect(got).To(BeEmpty())
 		Expect(empty).To(ConsistOf("inventory"))
 	})
 
 	It("reports nothing when every entry matched", func() {
-		_, empty, err := Resolve(index, "+vmi-cpu")
+		_, empty, err := Resolve(index, "+vmi-cpu", GroupDefaults)
 		Expect(err).ToNot(HaveOccurred())
 		Expect(empty).To(BeEmpty())
+	})
+})
+
+// Under EveryGroup nothing else is publishing this artifact type, so the
+// Default: false groups have to come back on: leaving them off would mean no
+// one publishes them.
+var _ = Describe("Resolve under EveryGroup", func() {
+	It("selects every item for an empty value", func() {
+		got, _, err := Resolve(index, "", EveryGroup)
+		Expect(err).ToNot(HaveOccurred())
+		Expect(got).To(HaveLen(4))
+		Expect(got).To(HaveKey("kubevirt_vmi_cpu_usage_seconds_total"))
+	})
+
+	// Removing the Default: true group is what separates the two modes: under
+	// GroupDefaults it empties the selection, here it leaves the rest.
+	It("rebases the relative form onto every item", func() {
+		got, _, err := Resolve(index, "-guest-agent", EveryGroup)
+		Expect(err).ToNot(HaveOccurred())
+		Expect(slices.Sorted(maps.Keys(got))).To(ConsistOf(
+			"kubevirt_vmi_cpu_usage_seconds_total", "kubevirt_vmi_guest_load_1m",
+		))
+	})
+
+	// The absolute forms say exactly what they want, so the mode must not
+	// widen them.
+	It("leaves the absolute forms alone", func() {
+		got, _, err := Resolve(index, "guest-agent", EveryGroup)
+		Expect(err).ToNot(HaveOccurred())
+		Expect(got).To(HaveLen(2))
+
+		got, _, err = Resolve(index, "none", EveryGroup)
+		Expect(err).ToNot(HaveOccurred())
+		Expect(got).To(BeEmpty())
 	})
 })

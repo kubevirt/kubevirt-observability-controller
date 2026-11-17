@@ -60,6 +60,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
 
 	"github.com/kubevirt/kubevirt-observability-controller/pkg/controller"
+	"github.com/kubevirt/kubevirt-observability-controller/pkg/monitoring/groups"
 	"github.com/kubevirt/kubevirt-observability-controller/pkg/monitoring/metrics"
 	"github.com/kubevirt/kubevirt-observability-controller/pkg/monitoring/metrics/devicedrivers"
 	"github.com/kubevirt/kubevirt-observability-controller/pkg/monitoring/metrics/vmstats"
@@ -133,15 +134,18 @@ func main() {
 		"Comma-separated list of OpenSSL group names. "+
 			"Only valid with --tls-security-profile=Custom.")
 	const allowlistGrammar = "Comma-separated list of group names or individual %s. " +
-		"Empty (default) selects the groups KubeVirt does not itself publish. " +
 		"A bare list is absolute but prefixing every entry with + or - adjusts the default set. " +
-		"\"all\" and \"none\" select everything or nothing."
+		"\"all\" and \"none\" select everything or nothing. Empty (default) selects %s."
 	flag.StringVar(&metricsAllowlist, "metrics-allowlist", "",
-		fmt.Sprintf(allowlistGrammar, "metric names to expose"))
+		fmt.Sprintf(allowlistGrammar, "metric names to expose",
+			"the groups KubeVirt does not itself publish"))
+	const ruleDefault = "the groups KubeVirt does not itself publish, or every group " +
+		"when --enable-vmstats is set, because KubeVirt publishes no PrometheusRule at all " +
+		"once the VMStatsCollector feature gate that --enable-vmstats depends on is enabled"
 	flag.StringVar(&alertsAllowlistRaw, "alerts-allowlist", "",
-		fmt.Sprintf(allowlistGrammar, "alert names to include in the PrometheusRule"))
+		fmt.Sprintf(allowlistGrammar, "alert names to include in the PrometheusRule", ruleDefault))
 	flag.StringVar(&recordingRulesAllowlistRaw, "recording-rules-allowlist", "",
-		fmt.Sprintf(allowlistGrammar, "recording rule names to include in the PrometheusRule"))
+		fmt.Sprintf(allowlistGrammar, "recording rule names to include in the PrometheusRule", ruleDefault))
 	var enableVMStats bool
 	var vmstatsOpts vmstatsOptions
 	flag.BoolVar(&enableVMStats, "enable-vmstats", false,
@@ -291,7 +295,19 @@ func main() {
 		os.Exit(1)
 	}
 
-	sel, err := selection.ForFlags(podNamespace, metricsAllowlist, recordingRulesAllowlistRaw, alertsAllowlistRaw)
+	// --enable-vmstats is only functional when KubeVirt's VMStatsCollector
+	// feature gate is on: virt-handler answers /v1/vmstats with 403 otherwise.
+	// That same gate makes virt-operator skip prometheus-kubevirt-rules, so
+	// with the poller enabled nothing else publishes KubeVirt's alerts and
+	// recording rules and the controller has to publish all of them.
+	ruleDefaulting := groups.GroupDefaults
+	if enableVMStats {
+		ruleDefaulting = groups.EveryGroup
+	}
+
+	sel, err := selection.ForFlags(
+		podNamespace, metricsAllowlist, recordingRulesAllowlistRaw, alertsAllowlistRaw, ruleDefaulting,
+	)
 	if err != nil {
 		setupLog.Error(err, "invalid allowlist")
 		os.Exit(1)

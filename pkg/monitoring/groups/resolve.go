@@ -29,13 +29,34 @@ const (
 	tokenNone = "none"
 )
 
+// Defaulting says which groups an empty flag value resolves to, and which set
+// the relative form adjusts.
+//
+// Two modes exist because Group.Default answers "does KubeVirt publish this
+// itself?", and that answer is not the same for every artifact type. KubeVirt
+// always exports its own metrics, but virt-operator stops publishing the
+// prometheus-kubevirt-rules PrometheusRule once the VMStatsCollector feature
+// gate is on.
+type Defaulting int
+
+const (
+	// GroupDefaults resolves to the groups with Default: true, the ones whose
+	// contents KubeVirt does not publish itself.
+	GroupDefaults Defaulting = iota
+
+	// EveryGroup resolves to every group. It is for an artifact type nothing
+	// else publishes, where GroupDefaults would leave the remaining groups
+	// published by no one at all.
+	EveryGroup
+)
+
 // Resolve turns one --*-allowlist value into the set of item names to expose.
 //
 // The index maps every item of one artifact type to its group, so the same
 // grammar serves metrics, recording rules, and alerts. An entry is either a
 // group name or an item name:
 //
-//	""                     the groups with Default: true
+//	""                     the default set, per defaulting
 //	"all" / "none"         every item / no item
 //	"a,b"                  exactly the items of a and b
 //	"+a,-b"                the default set, plus a, minus b
@@ -49,12 +70,12 @@ const (
 // artifact type — inventory has no alerts — is legal rather than an error,
 // but it is worth telling the operator about: on its own it produces an empty
 // selection that looks like the typo this function otherwise rejects.
-func Resolve(index map[string]Name, raw string) (map[string]bool, []string, error) {
+func Resolve(index map[string]Name, raw string, defaulting Defaulting) (map[string]bool, []string, error) {
 	raw = strings.TrimSpace(raw)
 
 	switch raw {
 	case "":
-		return defaultSet(index), nil, nil
+		return defaultSet(index, defaulting), nil, nil
 	case tokenAll:
 		return allOf(index), nil, nil
 	case tokenNone:
@@ -73,7 +94,7 @@ func Resolve(index map[string]Name, raw string) (map[string]bool, []string, erro
 
 	selected := map[string]bool{}
 	if relative {
-		selected = defaultSet(index)
+		selected = defaultSet(index, defaulting)
 	}
 
 	var empty []string
@@ -184,7 +205,11 @@ func hint(index map[string]Name, name string) string {
 	return ""
 }
 
-func defaultSet(index map[string]Name) map[string]bool {
+func defaultSet(index map[string]Name, defaulting Defaulting) map[string]bool {
+	if defaulting == EveryGroup {
+		return allOf(index)
+	}
+
 	out := make(map[string]bool)
 	for item, g := range index {
 		if group, ok := Lookup(g); ok && group.Default {
