@@ -188,6 +188,10 @@ func (r *MetricsResourcesReconciler) buildDesiredSecret() *corev1.Secret {
 func (r *MetricsResourcesReconciler) buildDesiredServiceMonitor() *monitoringv1.ServiceMonitor {
 	endpoint := monitoringv1.Endpoint{
 		Port: metricsPortName,
+		// VMI metrics carry their own namespace/name labels. Without this,
+		// Prometheus keeps the target's namespace and renames ours to
+		// exported_namespace.
+		HonorLabels: true,
 	}
 	endpoint.Authorization = &monitoringv1.SafeAuthorization{
 		Credentials: &corev1.SecretKeySelector{

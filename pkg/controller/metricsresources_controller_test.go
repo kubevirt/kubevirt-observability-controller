@@ -83,6 +83,7 @@ var _ = Describe("MetricsResources Reconciler", func() {
 		err = r.Get(ctx, types.NamespacedName{Name: metricsServiceMonitorName, Namespace: namespace}, sm)
 		Expect(err).ToNot(HaveOccurred())
 		Expect(sm.Spec.Endpoints).To(HaveLen(1))
+		Expect(sm.Spec.Endpoints[0].HonorLabels).To(BeTrue())
 		Expect(sm.Spec.Endpoints[0].Scheme).ToNot(BeNil())
 		Expect(*sm.Spec.Endpoints[0].Scheme).To(Equal(monitoringv1.Scheme("https")))
 		Expect(sm.Spec.Endpoints[0].TLSConfig).ToNot(BeNil())
