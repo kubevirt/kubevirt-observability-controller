@@ -57,7 +57,7 @@ The controller accepts the following flags (set via the Deployment's `args`):
 | `--metrics-secure` | `true` | Serve metrics over HTTPS with authn/authz |
 | `--health-probe-bind-address` | `:8081` | Address the health probe endpoint binds to |
 | `--leader-elect` | `false` | Enable leader election for HA deployments |
-| `--enable-http2` | `false` | Enable HTTP/2 for metrics and webhook servers |
+| `--enable-http2` | `false` | Enable HTTP/2 for the metrics server |
 | `--tls-security-profile` | `""` | TLS security profile for the metrics server: `Old`, `Intermediate`, `Modern`, or `Custom` |
 | `--tls-min-version` | `""` | Minimum TLS version (e.g., `VersionTLS12`). Only valid with `--tls-security-profile=Custom` |
 | `--tls-ciphers` | `""` | Comma-separated OpenSSL cipher names. Only valid with `--tls-security-profile=Custom` |
@@ -69,7 +69,6 @@ The controller accepts the following flags (set via the Deployment's `args`):
 | `--vmstats-cert-path` | `""` | Directory containing the vmstats client certificate |
 | `--kubevirt-namespace` | own namespace | Namespace KubeVirt is installed in, where the `kubevirt-ca` CA bundle is read from |
 | `--metrics-cert-path` | `""` | Directory containing the metrics server TLS certificate |
-| `--webhook-cert-path` | `""` | Directory containing the webhook certificate |
 
 The default kustomize overlay sets `--metrics-bind-address=:8443` via `config/default/manager_metrics_patch.yaml`.
 
