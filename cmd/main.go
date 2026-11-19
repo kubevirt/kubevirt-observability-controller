@@ -413,6 +413,8 @@ func main() {
 	}
 }
 
+const vmstatsCertRetryInterval = 5 * time.Second
+
 type vmstatsOptions struct {
 	port              int
 	certPath          string
@@ -432,17 +434,6 @@ func setupVMStats(mgr manager.Manager, opts vmstatsOptions, allowlist map[string
 		os.Exit(1)
 	}
 
-	// A certificate watcher keeps up with the rotations virt-operator performs
-	// on the monitoring client certificate.
-	clientCertWatcher, err := certwatcher.New(
-		filepath.Join(opts.certPath, opts.certName),
-		filepath.Join(opts.certPath, opts.certKey),
-	)
-	if err != nil {
-		setupLog.Error(err, "unable to load vmstats client certificate")
-		os.Exit(1)
-	}
-
 	policy := vmstats.NewRequestPolicy(allowlist)
 	if !policy.Enabled() {
 		setupLog.Info("metrics allowlist keeps no vmstats metric, skipping vmstats polling")
@@ -457,47 +448,37 @@ func setupVMStats(mgr manager.Manager, opts vmstatsOptions, allowlist map[string
 			"namespace", opts.kubevirtNamespace, "configmap", vmstats.CAConfigMapName)
 	}
 
-	if err := mgr.Add(clientCertWatcher); err != nil {
-		setupLog.Error(err, "unable to add vmstats client certificate watcher to manager")
-		os.Exit(1)
-	}
-
-	clientCert := func() (*tls.Certificate, error) {
-		return clientCertWatcher.GetCertificate(nil)
-	}
-
-	httpClient := &http.Client{
-		Timeout: 30 * time.Second,
-		Transport: &http.Transport{
-			TLSClientConfig: vmstats.NewVMStatsTLSConfig(caManager, clientCert),
-		},
-	}
-
-	vmStatsClient := vmstats.NewVMStatsClient(httpClient, opts.port)
 	statsCache := vmstats.NewStatsCache()
-
 	if err := vmstats.RegisterCollector(statsCache, allowlist); err != nil {
 		setupLog.Error(err, "unable to register vmstats collector")
 		os.Exit(1)
 	}
 
+	certFile := filepath.Join(opts.certPath, opts.certName)
+	keyFile := filepath.Join(opts.certPath, opts.certKey)
+
 	if err := mgr.Add(manager.RunnableFunc(func(ctx context.Context) error {
+		clientCertWatcher, ok := waitForClientCert(ctx, certFile, keyFile)
+		if !ok {
+			return nil
+		}
+
 		if !mgr.GetCache().WaitForCacheSync(ctx) {
 			return fmt.Errorf("cache sync failed")
 		}
 
-		var stores *metrics.Stores
-		for {
-			stores = metrics.GetStores()
-			if stores != nil && stores.VMI != nil && stores.VirtHandlerPod != nil {
-				break
-			}
-			setupLog.Info("waiting for metrics stores to be initialized")
-			select {
-			case <-ctx.Done():
-				return ctx.Err()
-			case <-time.After(1 * time.Second):
-			}
+		stores, ok := waitForMetricsStores(ctx)
+		if !ok {
+			return nil
+		}
+
+		httpClient := &http.Client{
+			Timeout: 30 * time.Second,
+			Transport: &http.Transport{
+				TLSClientConfig: vmstats.NewVMStatsTLSConfig(caManager, func() (*tls.Certificate, error) {
+					return clientCertWatcher.GetCertificate(nil)
+				}),
+			},
 		}
 
 		poller := vmstats.NewPoller(
@@ -508,14 +489,55 @@ func setupVMStats(mgr manager.Manager, opts vmstatsOptions, allowlist map[string
 				Policy:        policy,
 			},
 			statsCache,
-			vmStatsClient,
+			vmstats.NewVMStatsClient(httpClient, opts.port),
 			stores.VMI,
 			stores.VirtHandlerPod,
 		)
-		return poller.Start(ctx)
+
+		errCh := make(chan error, 2)
+		go func() { errCh <- clientCertWatcher.Start(ctx) }()
+		go func() { errCh <- poller.Start(ctx) }()
+		return <-errCh
 	})); err != nil {
 		setupLog.Error(err, "unable to add vmstats poller")
 		os.Exit(1)
+	}
+}
+
+func waitForClientCert(ctx context.Context, certFile, keyFile string) (*certwatcher.CertWatcher, bool) {
+	for attempt := 0; ; attempt++ {
+		watcher, err := certwatcher.New(certFile, keyFile)
+		if err == nil {
+			if attempt > 0 {
+				setupLog.Info("vmstats client certificate became readable, starting vmstats polling")
+			}
+			return watcher, true
+		}
+
+		setupLog.Error(err, "vmstats disabled until the virt-handler monitoring client certificate is readable, retrying",
+			"cert", certFile, "key", keyFile, "retryIn", vmstatsCertRetryInterval)
+
+		select {
+		case <-ctx.Done():
+			return nil, false
+		case <-time.After(vmstatsCertRetryInterval):
+		}
+	}
+}
+
+func waitForMetricsStores(ctx context.Context) (*metrics.Stores, bool) {
+	for {
+		stores := metrics.GetStores()
+		if stores != nil && stores.VMI != nil && stores.VirtHandlerPod != nil {
+			return stores, true
+		}
+
+		setupLog.Info("waiting for metrics stores to be initialized")
+		select {
+		case <-ctx.Done():
+			return nil, false
+		case <-time.After(1 * time.Second):
+		}
 	}
 }
 
