@@ -11,12 +11,12 @@ tests:
   - name: OutdatedGuestDeviceDrivers fires after one hour
     interval: 1m
     input_series:
-      - series: 'kubevirt_vmi_guest_device_driver_timestamp_seconds{namespace="default",name="vm-old",device_id="1041",driver_name="netkvm",driver_version="100.85.104.16700",guest_os_version_id="2022"}'
-        values: '1700000000x70'
-      - series: 'kubevirt_vmi_guest_device_driver_timestamp_seconds{name="vm-no-namespace",device_id="1041",driver_name="netkvm",driver_version="100.85.104.16700",guest_os_version_id="2022"}'
-        values: '1700000000x70'
-      - series: 'kubevirt_guest_device_driver_latest_version_info{device_id="1041",driver_version="100.95.104.26200",guest_os_version_id="2022"}'
-        values: '1x70'
+      - series: 'kubevirt_vmi_guest_device_driver_build_number{namespace="default",name="vm-old",device_id="1041",driver_name="netkvm",driver_version="100.85.104.16700",guest_os_version_id="2022"}'
+        values: '16700x70'
+      - series: 'kubevirt_vmi_guest_device_driver_build_number{name="vm-no-namespace",device_id="1041",driver_name="netkvm",driver_version="100.85.104.16700",guest_os_version_id="2022"}'
+        values: '16700x70'
+      - series: 'kubevirt_guest_device_driver_latest_build_number{device_id="1041",driver_version="100.95.104.26200",guest_os_version_id="2022"}'
+        values: '26200x70'
     alert_rule_test:
       - alertname: OutdatedGuestDeviceDrivers
         eval_time: 59m
@@ -37,15 +37,15 @@ tests:
               kubernetes_operator_part_of: kubevirt
               kubernetes_operator_component: kubevirt
             exp_annotations:
-              summary: "A guest device driver is outdated: its installed version is not the latest known version for that device and guest OS version."
+              summary: "A guest device driver is outdated: its installed build is older than the latest configured build for that device and guest OS version."
               description: "VirtualMachine vm-old in namespace default is running driver netkvm version 100.85.104.16700, which is outdated for guest OS version 2022."
               runbook_url: "https://kubevirt.io/monitoring/runbooks/OutdatedGuestDeviceDrivers"
 
   - name: with no drivers config the alert cannot fire
     interval: 1m
     input_series:
-      - series: 'kubevirt_vmi_guest_device_driver_timestamp_seconds{namespace="default",name="vm-old",device_id="1041",driver_name="netkvm",driver_version="100.85.104.16700",guest_os_version_id="2022"}'
-        values: '1700000000x70'
+      - series: 'kubevirt_vmi_guest_device_driver_build_number{namespace="default",name="vm-old",device_id="1041",driver_name="netkvm",driver_version="100.85.104.16700",guest_os_version_id="2022"}'
+        values: '16700x70'
     alert_rule_test:
       - alertname: OutdatedGuestDeviceDrivers
         eval_time: 70m
@@ -1161,3 +1161,17 @@ tests:
           name: vm-09
           volume_name: hotplug-pvc
           vm: vm-09
+
+  - name: equal or newer builds never alert even when version prefixes differ
+    interval: 1m
+    input_series:
+    - series: kubevirt_vmi_guest_device_driver_build_number{device_id="1041",driver_name="netkvm",driver_version="100.90.105.30200",guest_os_version_id="2022",name="same-build",namespace="default"}
+      values: 30200x70
+    - series: kubevirt_vmi_guest_device_driver_build_number{device_id="1041",driver_name="netkvm",driver_version="100.90.103.30300",guest_os_version_id="2022",name="newer-build",namespace="default"}
+      values: 30300x70
+    - series: kubevirt_guest_device_driver_latest_build_number{device_id="1041",driver_version="100.103.104.30200",guest_os_version_id="2022"}
+      values: 30200x70
+    alert_rule_test:
+    - alertname: OutdatedGuestDeviceDrivers
+      eval_time: 70m
+      exp_alerts: []

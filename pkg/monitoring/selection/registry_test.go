@@ -111,6 +111,8 @@ var _ = Describe("Default selection", func() {
 			// guest-drivers
 			"kubevirt_vmi_guest_device_driver_timestamp_seconds",
 			"kubevirt_guest_device_driver_latest_version_info",
+			"kubevirt_guest_device_driver_latest_build_number",
+			"kubevirt_vmi_guest_device_driver_build_number",
 			"kubevirt_guest_device_driver_config_invalid",
 			// guest-agent
 			"kubevirt_vmi_guest_agent_connected",
@@ -144,7 +146,7 @@ var _ = Describe("Default selection", func() {
 
 	It("exposes exactly one recording rule", func() {
 		Expect(selected(recordingRuleIndex(), "")).To(ConsistOf(
-			"vmi:kubevirt_vmi_guest_device_driver_timestamp_seconds:max",
+			"vmi:kubevirt_vmi_guest_device_driver_build_number:max",
 		))
 	})
 
@@ -164,7 +166,7 @@ var _ = Describe("ForFlags", func() {
 		sel, err := selection.ForFlags(testNamespace, "", "", "", groups.GroupDefaults)
 		Expect(err).ToNot(HaveOccurred())
 
-		Expect(sel.Metrics).To(HaveLen(25))
+		Expect(sel.Metrics).To(HaveLen(27))
 		Expect(sel.RecordingRules).To(HaveLen(1))
 		Expect(sel.Alerts).To(HaveLen(3))
 		Expect(sel.Empty).To(BeEmpty())
@@ -224,7 +226,7 @@ var _ = Describe("ForFlags with EveryGroup rule defaulting", func() {
 		sel, err := selection.ForFlags(testNamespace, "", "", "", groups.EveryGroup)
 		Expect(err).ToNot(HaveOccurred())
 
-		Expect(sel.Metrics).To(HaveLen(25))
+		Expect(sel.Metrics).To(HaveLen(27))
 		Expect(sel.Metrics).ToNot(HaveKey("kubevirt_vmi_memory_resident_bytes"))
 	})
 

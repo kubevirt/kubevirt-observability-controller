@@ -25,6 +25,8 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
+	"github.com/rhobs/operator-observability-toolkit/pkg/operatormetrics"
+
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	k6tv1 "kubevirt.io/api/core/v1"
 
@@ -40,6 +42,16 @@ func device(driverDate int64, name, version string, deviceID int64) string {
 
 func devicesPayload(devices ...string) string {
 	return `{"return":[` + strings.Join(devices, ",") + `]}`
+}
+
+func guestDeviceSamples(report *VMIReport, metric operatormetrics.Metric) []operatormetrics.CollectorResult {
+	var samples []operatormetrics.CollectorResult
+	for _, sample := range collectGuestDevices(report) {
+		if sample.Metric == metric {
+			samples = append(samples, sample)
+		}
+	}
+	return samples
 }
 
 var _ = Describe("Guest Metrics", func() {
@@ -130,7 +142,7 @@ var _ = Describe("Guest Metrics", func() {
 			device(1651363200000000000, "Red Hat VirtIO SCSI controller", "100.85.104.20800", 4162),
 		)
 
-		results := collectGuestDevices(report)
+		results := guestDeviceSamples(report, guestDeviceDriverTimestamp)
 
 		Expect(results).To(HaveLen(1))
 		Expect(results[0].Value).To(Equal(1651363200.0))
@@ -143,11 +155,37 @@ var _ = Describe("Guest Metrics", func() {
 		Expect(labels).ToNot(HaveKey("device_type"))
 	})
 
+	It("should expose the numeric build with the device and guest OS labels", func() {
+		report.Stats.GuestGetDevices = devicesPayload(
+			device(1651363200000000000, "netkvm", "100.103.105.30201", 4161),
+		)
+		results := guestDeviceSamples(report, guestDeviceDriverBuildNumber)
+		Expect(results).To(HaveLen(1))
+		Expect(results[0].Value).To(Equal(30201.0))
+		Expect(results[0].ConstLabels).To(HaveKeyWithValue("device_id", "1041"))
+		Expect(results[0].ConstLabels).To(HaveKeyWithValue("guest_os_version_id", "2022"))
+		Expect(results[0].ConstLabels).To(HaveKeyWithValue("driver_version", "100.103.105.30201"))
+	})
+
+	It("should keep timestamps but omit build comparisons for unknown version formats", func() {
+		report.Stats.GuestGetDevices = devicesPayload(
+			device(1651363200000000000, "driver", "1.4.0", 4161),
+		)
+		Expect(guestDeviceSamples(report, guestDeviceDriverBuildNumber)).To(BeEmpty())
+		Expect(guestDeviceSamples(report, guestDeviceDriverTimestamp)).To(HaveLen(1))
+	})
+
+	It("should not duplicate build series for repeated devices", func() {
+		driver := device(1651363200000000000, "netkvm", "100.103.104.30200", 4161)
+		report.Stats.GuestGetDevices = devicesPayload(driver, driver)
+		Expect(guestDeviceSamples(report, guestDeviceDriverBuildNumber)).To(HaveLen(1))
+	})
+
 	It("should report labels the guest did not report as none", func() {
 		report.Stats.GuestGetDevices =
 			`{"return":[{"driver-date":1736726400000000000,"driver-name":"VirtIO Balloon Driver"}]}`
 
-		results := collectGuestDevices(report)
+		results := guestDeviceSamples(report, guestDeviceDriverTimestamp)
 		Expect(results).To(HaveLen(1))
 		Expect(results[0].Value).To(Equal(1736726400.0))
 
@@ -162,7 +200,7 @@ var _ = Describe("Guest Metrics", func() {
 			device(1736726400000000000, "VirtIO Balloon Driver", "100.85.104.20800", -1),
 		)
 
-		results := collectGuestDevices(report)
+		results := guestDeviceSamples(report, guestDeviceDriverTimestamp)
 
 		Expect(results).To(HaveLen(1))
 		Expect(results[0].ConstLabels).To(HaveKeyWithValue("device_id", noneLabelValue))
@@ -176,7 +214,7 @@ var _ = Describe("Guest Metrics", func() {
 			scsi,
 		)
 
-		results := collectGuestDevices(report)
+		results := guestDeviceSamples(report, guestDeviceDriverTimestamp)
 
 		Expect(results).To(HaveLen(2), "the repeated SCSI controller should be reported once")
 
@@ -193,7 +231,7 @@ var _ = Describe("Guest Metrics", func() {
 			device(1771372800000000000, "Red Hat VirtIO SCSI controller", "100.103.104.29700", 4162),
 		)
 
-		Expect(collectGuestDevices(report)).To(HaveLen(2))
+		Expect(guestDeviceSamples(report, guestDeviceDriverTimestamp)).To(HaveLen(2))
 	})
 
 	DescribeTable("should label a device the way the drivers config normalizes the same id",
@@ -202,7 +240,7 @@ var _ = Describe("Guest Metrics", func() {
 				device(1749427200000000000, "Red Hat VirtIO Ethernet Adapter", "100.101.104.28200", reported),
 			)
 
-			results := collectGuestDevices(report)
+			results := guestDeviceSamples(report, guestDeviceDriverTimestamp)
 			Expect(results).To(HaveLen(1))
 
 			normalized, err := metrics.NormalizeDeviceID(written)
@@ -222,7 +260,7 @@ var _ = Describe("Guest Metrics", func() {
 			device(1749427200000000000, "Red Hat VirtIO Ethernet Adapter", "100.101.104.28200", 69697),
 		)
 
-		results := collectGuestDevices(report)
+		results := guestDeviceSamples(report, guestDeviceDriverTimestamp)
 
 		Expect(results).To(HaveLen(2))
 		Expect(results[0].ConstLabels).To(HaveKeyWithValue("device_id", "1041"))
@@ -236,7 +274,7 @@ var _ = Describe("Guest Metrics", func() {
 		 {"driver-date":-1,"driver-name":"VirtIO Serial Driver","id":{"device-id":4163}}
 		]}`
 
-		Expect(collectGuestDevices(report)).To(BeEmpty())
+		Expect(guestDeviceSamples(report, guestDeviceDriverTimestamp)).To(BeEmpty())
 	})
 
 	It("should include GuestGetDevices in the collected guest metrics", func() {
@@ -254,9 +292,9 @@ var _ = Describe("Guest Metrics", func() {
 
 	It("should skip malformed GuestGetDevices JSON gracefully", func() {
 		report.Stats.GuestGetDevices = `{"return":{"not":"an array"}}`
-		Expect(collectGuestDevices(report)).To(BeEmpty())
+		Expect(guestDeviceSamples(report, guestDeviceDriverTimestamp)).To(BeEmpty())
 
 		report.Stats.GuestGetDevices = `[{invalid json`
-		Expect(collectGuestDevices(report)).To(BeEmpty())
+		Expect(guestDeviceSamples(report, guestDeviceDriverTimestamp)).To(BeEmpty())
 	})
 })

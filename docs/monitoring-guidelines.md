@@ -68,3 +68,33 @@ are exempt:
 - `OrphanedVirtualMachineInstances` (virt-handler infrastructure)
 - `OutdatedVirtualMachineInstanceWorkloads` (aggregate count of
   outdated workloads)
+
+### Guest driver build comparison
+
+`OutdatedGuestDeviceDrivers` fires after one hour when the installed driver
+build is lower than the highest configured build for the same PCI device ID
+and `guestOSVersionID`. For virtio-win versions such as `100.103.104.30200`,
+only the final component (`30200`) determines build ordering. The guest Windows
+release selects the reference; the kernel, RHEL certification and internal
+number components do not participate in the numeric comparison. Keep the full
+final component, so revisions such as `30201` are newer than `30200`.
+
+Equal or newer builds do not alert. For example, Balloon build `27100` can be
+current for Windows 10 while Windows 11 requires `29400`. If several versions
+are configured for one device and Windows release, the highest build is used;
+a lower listed build can therefore alert. A device or Windows release with no
+comparable reference produces no alert.
+
+The collectors expose installed and configured builds through
+`kubevirt_vmi_guest_device_driver_build_number` and
+`kubevirt_guest_device_driver_latest_build_number`. They retain the original
+version labels and existing version-info and timestamp metrics. Only versions
+with four unsigned 16-bit decimal components produce build metrics; unfamiliar
+formats are omitted from comparison rather than interpreted as build zero.
+The ConfigMap schema remains `v1alpha1`.
+
+The alert now uses
+`vmi:kubevirt_vmi_guest_device_driver_build_number:max` instead of the previous
+timestamp recording rule. Update explicit recording-rule allowlists or queries
+that reference that old name. The `guest-drivers` group selects the new metrics
+and rule automatically.

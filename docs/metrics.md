@@ -3,6 +3,7 @@
 | Name | Group | Kind | Type | Description |
 |------|-------|------|------|-------------|
 | kubevirt_guest_device_driver_config_invalid | `guest-drivers` | Metric | Gauge | 1 while the guest device drivers ConfigMap present in the cluster is rejected and the last valid versions are kept, 0 otherwise. |
+| kubevirt_guest_device_driver_latest_build_number | `guest-drivers` | Metric | Gauge | Final numeric component of a configured four-component Windows driver version. Compare only within the same device and guest OS version; unparseable versions are omitted. |
 | kubevirt_guest_device_driver_latest_version_info | `guest-drivers` | Metric | Gauge | Latest available guest device driver version for a device and guest OS version, as declared in the guest device drivers ConfigMap. |
 | kubevirt_network_attachment_definition_info | `inventory` | Metric | Gauge | Details about additional network interfaces attached to Virtual Machines. |
 | kubevirt_vm_create_date_timestamp_seconds | `vm-status` | Metric | Gauge | Virtual Machine creation timestamp. |
@@ -29,6 +30,7 @@
 | kubevirt_vmi_filesystem_capacity_bytes | `guest-filesystem` | Metric | Gauge | Total VM filesystem capacity in bytes. |
 | kubevirt_vmi_filesystem_used_bytes | `guest-filesystem` | Metric | Gauge | Used VM filesystem capacity in bytes. |
 | kubevirt_vmi_guest_agent_connected | `guest-agent` | Metric | Gauge | Whether the QEMU guest agent is connected to the VMI, from the AgentConnected condition in the VMI status. |
+| kubevirt_vmi_guest_device_driver_build_number | `guest-drivers` | Metric | Gauge | Final numeric component of the installed four-component Windows driver version. Compare only within the same device and guest OS version; unparseable versions are omitted. |
 | kubevirt_vmi_guest_device_driver_timestamp_seconds | `guest-drivers` | Metric | Gauge | Release date of the driver of a guest device, in seconds since the epoch, as reported by the guest agent. Windows guests only. |
 | kubevirt_vmi_guest_hostname | `guest-agent` | Metric | Gauge | Guest hostname from the guest agent. |
 | kubevirt_vmi_guest_interface_info | `vmi-interfaces` | Metric | Gauge | Network interface information reported by the guest agent in the VMI status. |
@@ -134,7 +136,7 @@
 | pvc:kubevirt_vmsnapshot_labels:info | `vm-snapshot` | Recording rule | Gauge | Returns the labels of the persistent volume claims that are used for restoring virtual machines. |
 | vm:kubevirt_vmsnapshot_disks_restored:sum | `vm-snapshot` | Recording rule | Gauge | Returns the total number of virtual machine disks restored from the source virtual machine. |
 | vm:kubevirt_vmsnapshot_restored_bytes:sum | `vm-snapshot` | Recording rule | Gauge | Returns the amount of space in bytes restored from the source virtual machine. |
-| vmi:kubevirt_vmi_guest_device_driver_timestamp_seconds:max | `guest-drivers` | Recording rule | Gauge | One series per outdated (VMI, device) pair: the installed guest device driver version does not match the latest version known for that device and guest OS version. |
+| vmi:kubevirt_vmi_guest_device_driver_build_number:max | `guest-drivers` | Recording rule | Gauge | Installed driver build number when it is lower than the highest configured build for the same device and guest OS version. RHEL and internal version components are ignored. |
 | vmi:kubevirt_vmi_guest_queue_length:sum | `vmi-cpu` | Recording rule | Gauge | Guest queue length. |
 | vmi:kubevirt_vmi_memory_available_bytes:sum | `vmi-memory` | Recording rule | Gauge | Sum of available memory bytes per VMI (aggregated by name, namespace). |
 | vmi:kubevirt_vmi_memory_headroom_ratio:sum | `vmi-memory` | Recording rule | Gauge | Usable memory to available memory ratio per VMI (aggregated by name, namespace). |

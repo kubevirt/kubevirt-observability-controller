@@ -79,7 +79,7 @@ var categoryMetrics = map[category][]operatormetrics.Metric{
 	catGuestGetTimezone: {guestTimezone},
 	catGuestGetUsers:    {guestUserCount},
 	catGuestGetFsInfo:   {filesystemCapacityBytes, filesystemUsedBytes},
-	catGuestGetDevices:  {guestDeviceDriverTimestamp},
+	catGuestGetDevices:  {guestDeviceDriverTimestamp, guestDeviceDriverBuildNumber},
 }
 
 type RequestPolicy struct {

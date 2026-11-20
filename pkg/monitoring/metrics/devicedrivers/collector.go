@@ -37,6 +37,16 @@ var (
 		[]string{"device_id", "guest_os_version_id", "driver_version", "device_name"},
 	)
 
+	latestBuildNumber = operatormetrics.NewGaugeVec(
+		operatormetrics.MetricOpts{
+			Name:        "kubevirt_guest_device_driver_latest_build_number",
+			ExtraFields: groups.Tag(groups.GuestDrivers),
+			Help: "Final numeric component of a configured four-component Windows driver version. " +
+				"Compare only within the same device and guest OS version; unparseable versions are omitted.",
+		},
+		[]string{"device_id", "guest_os_version_id", "driver_version", "device_name"},
+	)
+
 	configInvalid = operatormetrics.NewGauge(
 		operatormetrics.MetricOpts{
 			Name:        "kubevirt_guest_device_driver_config_invalid",
@@ -68,7 +78,7 @@ func RegisterCollector(cache *DriversCache, allowlist map[string]bool) error {
 // AllMetrics returns every guest device driver metric before filtering, so the
 // selection layer can read group membership without registering the collector.
 func AllMetrics() []operatormetrics.Metric {
-	return []operatormetrics.Metric{latestVersionInfo, configInvalid}
+	return []operatormetrics.Metric{latestVersionInfo, latestBuildNumber, configInvalid}
 }
 
 func driversCollector(cache *DriversCache) operatormetrics.Collector {
@@ -77,23 +87,26 @@ func driversCollector(cache *DriversCache) operatormetrics.Collector {
 		CollectCallback: func() []operatormetrics.CollectorResult {
 			entries := cache.List()
 
-			crs := make([]operatormetrics.CollectorResult, 0, len(entries)+1)
+			crs := make([]operatormetrics.CollectorResult, 0, 2*len(entries)+1)
 			crs = append(crs, operatormetrics.CollectorResult{
 				Metric: configInvalid,
 				Value:  boolToFloat(cache.ConfigInvalid()),
 			})
 
 			for _, entry := range entries {
+				labels := []string{entry.DeviceID, entry.GuestOSVersionID, entry.DriverVersion, entry.DeviceName}
 				crs = append(crs, operatormetrics.CollectorResult{
 					Metric: latestVersionInfo,
-					Labels: []string{
-						entry.DeviceID,
-						entry.GuestOSVersionID,
-						entry.DriverVersion,
-						entry.DeviceName,
-					},
-					Value: 1.0,
+					Labels: labels,
+					Value:  1.0,
 				})
+				if build, ok := metrics.DriverBuildNumber(entry.DriverVersion); ok {
+					crs = append(crs, operatormetrics.CollectorResult{
+						Metric: latestBuildNumber,
+						Labels: labels,
+						Value:  float64(build),
+					})
+				}
 			}
 
 			return crs

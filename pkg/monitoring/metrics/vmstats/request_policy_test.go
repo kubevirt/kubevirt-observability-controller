@@ -48,6 +48,14 @@ var _ = Describe("resolveVMStatsRequest", func() {
 		Expect(req.GuestGetDevices).To(BeNil())
 	})
 
+	It("requests devices when only the build metric is selected", func() {
+		policy := NewRequestPolicy(map[string]bool{"kubevirt_vmi_guest_device_driver_build_number": true})
+		req := policy.Resolve(vmiWithOSID("mswindows"), "5.2.0")
+		Expect(req).ToNot(BeNil())
+		Expect(req.GuestGetDevices).ToNot(BeNil())
+		Expect(req.DomainStats).To(BeNil())
+	})
+
 	It("never requests categories the VMI status already answers", func() {
 		for _, id := range []string{"", "rhel", "mswindows"} {
 			req := NewRequestPolicy(nil).Resolve(vmiWithOSID(id), "8.2.0")

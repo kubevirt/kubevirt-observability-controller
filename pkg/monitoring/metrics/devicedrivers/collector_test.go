@@ -59,6 +59,36 @@ var _ = Describe("Collector", func() {
 		Expect(results[1].Labels).To(Equal([]string{"1041", "2019", "100.94.104.25200", "VirtIO network device"}))
 	})
 
+	It("should expose each configured build with its Windows version", func() {
+		cache.Store([]DriverEntry{
+			{DeviceID: "1041", GuestOSVersionID: "2022", DriverVersion: "100.103.104.30201"},
+			{DeviceID: "1041", GuestOSVersionID: "2019", DriverVersion: "100.95.105.26200"},
+		})
+		results := samplesFor("kubevirt_guest_device_driver_latest_build_number")
+		Expect(results).To(HaveLen(2))
+		Expect(results[0].Value).To(Equal(30201.0))
+		Expect(results[0].Labels).To(Equal([]string{"1041", "2022", "100.103.104.30201", ""}))
+		Expect(results[1].Value).To(Equal(26200.0))
+		Expect(results[1].Labels).To(Equal([]string{"1041", "2019", "100.95.105.26200", ""}))
+	})
+
+	It("should retain version info but omit build comparisons for unknown version formats", func() {
+		cache.Store([]DriverEntry{
+			{DeviceID: "1041", GuestOSVersionID: "2022", DriverVersion: "1.4.0"},
+		})
+		Expect(samplesFor("kubevirt_guest_device_driver_latest_build_number")).To(BeEmpty())
+		Expect(samplesFor("kubevirt_guest_device_driver_latest_version_info")).To(HaveLen(1))
+	})
+
+	It("should register the build metric independently", func() {
+		Expect(RegisterCollector(cache, map[string]bool{
+			"kubevirt_guest_device_driver_latest_build_number": true,
+		})).To(Succeed())
+		Expect(operatormetrics.ListMetrics()).To(HaveLen(1))
+		Expect(operatormetrics.ListMetrics()[0].GetOpts().Name).
+			To(Equal("kubevirt_guest_device_driver_latest_build_number"))
+	})
+
 	It("should report no version samples when the cache is empty", func() {
 		Expect(samplesFor("kubevirt_guest_device_driver_latest_version_info")).To(BeEmpty())
 	})

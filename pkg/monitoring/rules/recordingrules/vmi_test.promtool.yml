@@ -7,106 +7,108 @@ tests:
   - name: outdated driver is recorded
     interval: 1m
     input_series:
-      - series: 'kubevirt_vmi_guest_device_driver_timestamp_seconds{namespace="default",name="vm-old",device_id="1041",driver_name="netkvm",driver_version="100.85.104.16700",guest_os_version_id="2022"}'
-        values: '1700000000x5'
-      - series: 'kubevirt_guest_device_driver_latest_version_info{device_id="1041",driver_version="100.95.104.26200",guest_os_version_id="2022"}'
-        values: '1x5'
+      - series: 'kubevirt_vmi_guest_device_driver_build_number{namespace="default",name="vm-old",device_id="1041",driver_name="netkvm",driver_version="100.85.104.16700",guest_os_version_id="2022"}'
+        values: '16700x5'
+      - series: 'kubevirt_guest_device_driver_latest_build_number{device_id="1041",driver_version="100.95.104.26200",guest_os_version_id="2022"}'
+        values: '26200x5'
     promql_expr_test:
-      - expr: vmi:kubevirt_vmi_guest_device_driver_timestamp_seconds:max
+      - expr: vmi:kubevirt_vmi_guest_device_driver_build_number:max
         eval_time: 5m
         exp_samples:
-          - labels: 'vmi:kubevirt_vmi_guest_device_driver_timestamp_seconds:max{device_id="1041",driver_name="netkvm",driver_version="100.85.104.16700",guest_os_version_id="2022",name="vm-old",namespace="default"}'
-            value: 1700000000
+          - labels: 'vmi:kubevirt_vmi_guest_device_driver_build_number:max{device_id="1041",driver_name="netkvm",driver_version="100.85.104.16700",guest_os_version_id="2022",name="vm-old",namespace="default"}'
+            value: 16700
 
   - name: up-to-date driver is not recorded
     interval: 1m
     input_series:
-      - series: 'kubevirt_vmi_guest_device_driver_timestamp_seconds{namespace="default",name="vm-current",device_id="1041",driver_name="netkvm",driver_version="100.95.104.26200",guest_os_version_id="2022"}'
-        values: '1700000000x5'
-      - series: 'kubevirt_guest_device_driver_latest_version_info{device_id="1041",driver_version="100.95.104.26200",guest_os_version_id="2022"}'
-        values: '1x5'
+      - series: 'kubevirt_vmi_guest_device_driver_build_number{namespace="default",name="vm-current",device_id="1041",driver_name="netkvm",driver_version="100.95.104.26200",guest_os_version_id="2022"}'
+        values: '26200x5'
+      - series: 'kubevirt_guest_device_driver_latest_build_number{device_id="1041",driver_version="100.95.104.26200",guest_os_version_id="2022"}'
+        values: '26200x5'
     promql_expr_test:
-      - expr: vmi:kubevirt_vmi_guest_device_driver_timestamp_seconds:max
+      - expr: vmi:kubevirt_vmi_guest_device_driver_build_number:max
         eval_time: 5m
         exp_samples: []
 
   - name: device absent from the catalog is not recorded
     interval: 1m
     input_series:
-      - series: 'kubevirt_vmi_guest_device_driver_timestamp_seconds{namespace="default",name="vm-unknown",device_id="beef",driver_name="mysterykvm",driver_version="1.0.0.0",guest_os_version_id="2022"}'
-        values: '1700000000x5'
-      - series: 'kubevirt_guest_device_driver_latest_version_info{device_id="1041",driver_version="100.95.104.26200",guest_os_version_id="2022"}'
-        values: '1x5'
+      - series: 'kubevirt_vmi_guest_device_driver_build_number{namespace="default",name="vm-unknown",device_id="beef",driver_name="mysterykvm",driver_version="1.0.0.0",guest_os_version_id="2022"}'
+        values: '0x5'
+      - series: 'kubevirt_guest_device_driver_latest_build_number{device_id="1041",driver_version="100.95.104.26200",guest_os_version_id="2022"}'
+        values: '26200x5'
     promql_expr_test:
-      - expr: vmi:kubevirt_vmi_guest_device_driver_timestamp_seconds:max
+      - expr: vmi:kubevirt_vmi_guest_device_driver_build_number:max
         eval_time: 5m
         exp_samples: []
 
   - name: with no drivers config there is nothing to record
     interval: 1m
     input_series:
-      - series: 'kubevirt_vmi_guest_device_driver_timestamp_seconds{namespace="default",name="vm-old",device_id="1041",driver_name="netkvm",driver_version="100.85.104.16700",guest_os_version_id="2022"}'
-        values: '1700000000x5'
+      - series: 'kubevirt_vmi_guest_device_driver_build_number{namespace="default",name="vm-old",device_id="1041",driver_name="netkvm",driver_version="100.85.104.16700",guest_os_version_id="2022"}'
+        values: '16700x5'
     promql_expr_test:
-      - expr: vmi:kubevirt_vmi_guest_device_driver_timestamp_seconds:max
+      - expr: vmi:kubevirt_vmi_guest_device_driver_build_number:max
         eval_time: 5m
         exp_samples: []
 
   - name: a VMI reporting no guest OS version is not recorded
     interval: 1m
     input_series:
-      - series: 'kubevirt_vmi_guest_device_driver_timestamp_seconds{namespace="default",name="vm-no-os",device_id="1041",driver_name="netkvm",driver_version="100.85.104.16700",guest_os_version_id="<none>"}'
-        values: '1700000000x5'
-      - series: 'kubevirt_guest_device_driver_latest_version_info{device_id="1041",driver_version="100.95.104.26200",guest_os_version_id="2022"}'
-        values: '1x5'
+      - series: 'kubevirt_vmi_guest_device_driver_build_number{namespace="default",name="vm-no-os",device_id="1041",driver_name="netkvm",driver_version="100.85.104.16700",guest_os_version_id="<none>"}'
+        values: '16700x5'
+      - series: 'kubevirt_guest_device_driver_latest_build_number{device_id="1041",driver_version="100.95.104.26200",guest_os_version_id="2022"}'
+        values: '26200x5'
     promql_expr_test:
-      - expr: vmi:kubevirt_vmi_guest_device_driver_timestamp_seconds:max
+      - expr: vmi:kubevirt_vmi_guest_device_driver_build_number:max
         eval_time: 5m
         exp_samples: []
 
   - name: duplicate reference series from several controller replicas do not abort the rule
     interval: 1m
     input_series:
-      - series: 'kubevirt_vmi_guest_device_driver_timestamp_seconds{namespace="default",name="vm-old",device_id="1041",driver_name="netkvm",driver_version="100.85.104.16700",guest_os_version_id="2022",node="n1",instance="pod-1"}'
-        values: '1700000000x5'
-      - series: 'kubevirt_vmi_guest_device_driver_timestamp_seconds{namespace="default",name="vm-old",device_id="1041",driver_name="netkvm",driver_version="100.85.104.16700",guest_os_version_id="2022",node="n2",instance="pod-2"}'
-        values: '1700000000x5'
-      - series: 'kubevirt_guest_device_driver_latest_version_info{device_id="1041",driver_version="100.95.104.26200",guest_os_version_id="2022",instance="pod-1"}'
-        values: '1x5'
-      - series: 'kubevirt_guest_device_driver_latest_version_info{device_id="1041",driver_version="100.95.104.26200",guest_os_version_id="2022",instance="pod-2"}'
-        values: '1x5'
+      - series: 'kubevirt_vmi_guest_device_driver_build_number{namespace="default",name="vm-old",device_id="1041",driver_name="netkvm",driver_version="100.85.104.16700",guest_os_version_id="2022",node="n1",instance="pod-1"}'
+        values: '16700x5'
+      - series: 'kubevirt_vmi_guest_device_driver_build_number{namespace="default",name="vm-old",device_id="1041",driver_name="netkvm",driver_version="100.85.104.16700",guest_os_version_id="2022",node="n2",instance="pod-2"}'
+        values: '16700x5'
+      - series: 'kubevirt_guest_device_driver_latest_build_number{device_id="1041",driver_version="100.95.104.26200",guest_os_version_id="2022",instance="pod-1"}'
+        values: '26200x5'
+      - series: 'kubevirt_guest_device_driver_latest_build_number{device_id="1041",driver_version="100.95.104.26200",guest_os_version_id="2022",instance="pod-2"}'
+        values: '26200x5'
     promql_expr_test:
-      - expr: vmi:kubevirt_vmi_guest_device_driver_timestamp_seconds:max
+      - expr: vmi:kubevirt_vmi_guest_device_driver_build_number:max
         eval_time: 5m
         exp_samples:
-          - labels: 'vmi:kubevirt_vmi_guest_device_driver_timestamp_seconds:max{device_id="1041",driver_name="netkvm",driver_version="100.85.104.16700",guest_os_version_id="2022",name="vm-old",namespace="default"}'
-            value: 1700000000
+          - labels: 'vmi:kubevirt_vmi_guest_device_driver_build_number:max{device_id="1041",driver_name="netkvm",driver_version="100.85.104.16700",guest_os_version_id="2022",name="vm-old",namespace="default"}'
+            value: 16700
 
-  - name: any listed current version counts as current
+  - name: the highest configured build is used for the same guest OS version
     interval: 1m
     input_series:
-      - series: 'kubevirt_vmi_guest_device_driver_timestamp_seconds{namespace="default",name="vm-rollout",device_id="1041",driver_name="netkvm",driver_version="100.95.104.26100",guest_os_version_id="2022"}'
-        values: '1700000000x5'
-      - series: 'kubevirt_guest_device_driver_latest_version_info{device_id="1041",driver_version="100.95.104.26200",guest_os_version_id="2022"}'
-        values: '1x5'
-      - series: 'kubevirt_guest_device_driver_latest_version_info{device_id="1041",driver_version="100.95.104.26100",guest_os_version_id="2022"}'
-        values: '1x5'
+      - series: 'kubevirt_vmi_guest_device_driver_build_number{namespace="default",name="vm-rollout",device_id="1041",driver_name="netkvm",driver_version="100.95.104.26100",guest_os_version_id="2022"}'
+        values: '26100x5'
+      - series: 'kubevirt_guest_device_driver_latest_build_number{device_id="1041",driver_version="100.95.104.26200",guest_os_version_id="2022"}'
+        values: '26200x5'
+      - series: 'kubevirt_guest_device_driver_latest_build_number{device_id="1041",driver_version="100.95.104.26100",guest_os_version_id="2022"}'
+        values: '26100x5'
     promql_expr_test:
-      - expr: vmi:kubevirt_vmi_guest_device_driver_timestamp_seconds:max
+      - expr: vmi:kubevirt_vmi_guest_device_driver_build_number:max
         eval_time: 5m
-        exp_samples: []
+        exp_samples:
+          - labels: 'vmi:kubevirt_vmi_guest_device_driver_build_number:max{device_id="1041",driver_name="netkvm",driver_version="100.95.104.26100",guest_os_version_id="2022",name="vm-rollout",namespace="default"}'
+            value: 26100
 
   - name: a driver outdated only for another guest OS version is not recorded
     interval: 1m
     input_series:
-      - series: 'kubevirt_vmi_guest_device_driver_timestamp_seconds{namespace="default",name="vm-2019",device_id="1041",driver_name="netkvm",driver_version="100.94.104.25200",guest_os_version_id="2019"}'
-        values: '1700000000x5'
-      - series: 'kubevirt_guest_device_driver_latest_version_info{device_id="1041",driver_version="100.95.104.26200",guest_os_version_id="2022"}'
-        values: '1x5'
-      - series: 'kubevirt_guest_device_driver_latest_version_info{device_id="1041",driver_version="100.94.104.25200",guest_os_version_id="2019"}'
-        values: '1x5'
+      - series: 'kubevirt_vmi_guest_device_driver_build_number{namespace="default",name="vm-2019",device_id="1041",driver_name="netkvm",driver_version="100.94.104.25200",guest_os_version_id="2019"}'
+        values: '25200x5'
+      - series: 'kubevirt_guest_device_driver_latest_build_number{device_id="1041",driver_version="100.95.104.26200",guest_os_version_id="2022"}'
+        values: '26200x5'
+      - series: 'kubevirt_guest_device_driver_latest_build_number{device_id="1041",driver_version="100.94.104.25200",guest_os_version_id="2019"}'
+        values: '25200x5'
     promql_expr_test:
-      - expr: vmi:kubevirt_vmi_guest_device_driver_timestamp_seconds:max
+      - expr: vmi:kubevirt_vmi_guest_device_driver_build_number:max
         eval_time: 5m
         exp_samples: []
 
@@ -131,3 +133,93 @@ tests:
         exp_samples:
           - labels: 'vmi:kubevirt_vmi_guest_queue_length:sum{name="vm1",namespace="default"}'
             value: 23
+
+  - name: equal builds are current despite different RHEL and internal version components
+    interval: 1m
+    input_series:
+    - series: kubevirt_vmi_guest_device_driver_build_number{device_id="1041",driver_name="netkvm",driver_version="100.90.105.30200",guest_os_version_id="2022",name="same-build",namespace="default"}
+      values: 30200x5
+    - series: kubevirt_guest_device_driver_latest_build_number{device_id="1041",driver_version="100.103.104.30200",guest_os_version_id="2022"}
+      values: 30200x5
+    promql_expr_test:
+    - expr: vmi:kubevirt_vmi_guest_device_driver_build_number:max
+      eval_time: 5m
+      exp_samples: []
+  - name: a newer build does not alert even with a lower RHEL component
+    interval: 1m
+    input_series:
+    - series: kubevirt_vmi_guest_device_driver_build_number{device_id="1041",driver_name="netkvm",driver_version="100.90.103.30300",guest_os_version_id="2022",name="newer-build",namespace="default"}
+      values: 30300x5
+    - series: kubevirt_guest_device_driver_latest_build_number{device_id="1041",driver_version="100.103.104.30200",guest_os_version_id="2022"}
+      values: 30200x5
+    promql_expr_test:
+    - expr: vmi:kubevirt_vmi_guest_device_driver_build_number:max
+      eval_time: 5m
+      exp_samples: []
+  - name: an older build is recorded even with higher RHEL and internal components
+    interval: 1m
+    input_series:
+    - series: kubevirt_vmi_guest_device_driver_build_number{device_id="1041",driver_name="netkvm",driver_version="100.104.105.30100",guest_os_version_id="2022",name="older-build",namespace="default"}
+      values: 30100x5
+    - series: kubevirt_guest_device_driver_latest_build_number{device_id="1041",driver_version="100.103.104.30200",guest_os_version_id="2022"}
+      values: 30200x5
+    promql_expr_test:
+    - expr: vmi:kubevirt_vmi_guest_device_driver_build_number:max
+      eval_time: 5m
+      exp_samples:
+      - labels: vmi:kubevirt_vmi_guest_device_driver_build_number:max{device_id="1041",driver_name="netkvm",driver_version="100.104.105.30100",guest_os_version_id="2022",name="older-build",namespace="default"}
+        value: 30100
+  - name: the full build component preserves revisions below one hundred
+    interval: 1m
+    input_series:
+    - series: kubevirt_vmi_guest_device_driver_build_number{device_id="1041",driver_name="netkvm",driver_version="100.103.104.30200",guest_os_version_id="2022",name="older-revision",namespace="default"}
+      values: 30200x5
+    - series: kubevirt_guest_device_driver_latest_build_number{device_id="1041",driver_version="100.103.104.30201",guest_os_version_id="2022"}
+      values: 30201x5
+    promql_expr_test:
+    - expr: vmi:kubevirt_vmi_guest_device_driver_build_number:max
+      eval_time: 5m
+      exp_samples:
+      - labels: vmi:kubevirt_vmi_guest_device_driver_build_number:max{device_id="1041",driver_name="netkvm",driver_version="100.103.104.30200",guest_os_version_id="2022",name="older-revision",namespace="default"}
+        value: 30200
+  - name: Windows 10 and Windows 11 use their own Balloon driver build references
+    interval: 1m
+    input_series:
+    - series: kubevirt_vmi_guest_device_driver_build_number{device_id="1045",driver_name="netkvm",driver_version="100.100.104.27100",guest_os_version_id="10",name="win10",namespace="default"}
+      values: 27100x5
+    - series: kubevirt_vmi_guest_device_driver_build_number{device_id="1045",driver_name="netkvm",driver_version="100.100.104.27100",guest_os_version_id="11",name="win11",namespace="default"}
+      values: 27100x5
+    - series: kubevirt_guest_device_driver_latest_build_number{device_id="1045",driver_version="100.100.104.27100",guest_os_version_id="10"}
+      values: 27100x5
+    - series: kubevirt_guest_device_driver_latest_build_number{device_id="1045",driver_version="100.102.104.29400",guest_os_version_id="11"}
+      values: 29400x5
+    promql_expr_test:
+    - expr: vmi:kubevirt_vmi_guest_device_driver_build_number:max
+      eval_time: 5m
+      exp_samples:
+      - labels: vmi:kubevirt_vmi_guest_device_driver_build_number:max{device_id="1045",driver_name="netkvm",driver_version="100.100.104.27100",guest_os_version_id="11",name="win11",namespace="default"}
+        value: 27100
+  - name: a guest OS absent from the catalog is not compared against other OS releases
+    interval: 1m
+    input_series:
+    - series: kubevirt_vmi_guest_device_driver_build_number{device_id="1041",driver_name="netkvm",driver_version="61.77.104.17200",guest_os_version_id="7",name="unknown-os",namespace="default"}
+      values: 17200x5
+    - series: kubevirt_guest_device_driver_latest_build_number{device_id="1041",driver_version="100.103.104.30200",guest_os_version_id="2022"}
+      values: 30200x5
+    promql_expr_test:
+    - expr: vmi:kubevirt_vmi_guest_device_driver_build_number:max
+      eval_time: 5m
+      exp_samples: []
+  - name: numeric builds are not ordered lexicographically
+    interval: 1m
+    input_series:
+    - series: kubevirt_vmi_guest_device_driver_build_number{device_id="1041",driver_name="netkvm",driver_version="100.103.104.9900",guest_os_version_id="2022",name="numeric",namespace="default"}
+      values: 9900x5
+    - series: kubevirt_guest_device_driver_latest_build_number{device_id="1041",driver_version="100.103.104.10000",guest_os_version_id="2022"}
+      values: 10000x5
+    promql_expr_test:
+    - expr: vmi:kubevirt_vmi_guest_device_driver_build_number:max
+      eval_time: 5m
+      exp_samples:
+      - labels: vmi:kubevirt_vmi_guest_device_driver_build_number:max{device_id="1041",driver_name="netkvm",driver_version="100.103.104.9900",guest_os_version_id="2022",name="numeric",namespace="default"}
+        value: 9900

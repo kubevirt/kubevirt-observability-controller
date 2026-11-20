@@ -36,7 +36,7 @@ var (
 	guestMetricsList = []operatormetrics.Metric{
 		guestHostname, guestTimezone,
 		guestUserCount, filesystemCapacityBytes, filesystemUsedBytes,
-		guestDeviceDriverTimestamp,
+		guestDeviceDriverTimestamp, guestDeviceDriverBuildNumber,
 	}
 
 	guestHostname = operatormetrics.NewGauge(operatormetrics.MetricOpts{
@@ -69,6 +69,12 @@ var (
 		ExtraFields: groups.Tag(groups.GuestDrivers),
 		Help: "Release date of the driver of a guest device, in seconds since the epoch, " +
 			"as reported by the guest agent. Windows guests only.",
+	})
+	guestDeviceDriverBuildNumber = operatormetrics.NewGauge(operatormetrics.MetricOpts{
+		Name:        "kubevirt_vmi_guest_device_driver_build_number",
+		ExtraFields: groups.Tag(groups.GuestDrivers),
+		Help: "Final numeric component of the installed four-component Windows driver version. " +
+			"Compare only within the same device and guest OS version; unparseable versions are omitted.",
 	})
 )
 
@@ -214,13 +220,18 @@ func collectGuestDevices(report *VMIReport) []operatormetrics.CollectorResult {
 		}
 		seen[key] = struct{}{}
 
+		labels := map[string]string{
+			"driver_name":         key.name,
+			"driver_version":      key.version,
+			"device_id":           key.deviceID,
+			"guest_os_version_id": osVersionID,
+		}
 		crs = append(crs, report.newCollectorResultWithLabels(
-			guestDeviceDriverTimestamp, nanosecondsToSeconds(uint64(*d.DriverDate)), map[string]string{
-				"driver_name":         key.name,
-				"driver_version":      key.version,
-				"device_id":           key.deviceID,
-				"guest_os_version_id": osVersionID,
-			}))
+			guestDeviceDriverTimestamp, nanosecondsToSeconds(uint64(*d.DriverDate)), labels))
+		if build, ok := metrics.DriverBuildNumber(key.version); ok {
+			crs = append(crs, report.newCollectorResultWithLabels(
+				guestDeviceDriverBuildNumber, float64(build), labels))
+		}
 	}
 	return crs
 }
