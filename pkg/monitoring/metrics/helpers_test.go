@@ -258,4 +258,32 @@ var _ = Describe("Helper functions", func() {
 			Entry("wider than 16 bits", "11041"),
 		)
 	})
+
+	Describe("DriverBuildNumber", func() {
+		DescribeTable("should return the last of the four components",
+			func(version string, expected uint16) {
+				Expect(DriverBuildNumber(version)).To(Equal(expected))
+			},
+			Entry("virtio-win network driver", "100.103.104.30200", uint16(30200)),
+			Entry("one build newer", "100.103.104.30201", uint16(30201)),
+			Entry("surrounding spaces", " 100.95.104.26200 ", uint16(26200)),
+			Entry("zero build", "1.0.0.0", uint16(0)),
+			Entry("the widest each component can be", "65535.65535.65535.65535", uint16(65535)),
+		)
+
+		DescribeTable("should reject a version that carries no build number",
+			func(version string) {
+				_, err := DriverBuildNumber(version)
+				Expect(err).To(MatchError(ContainSubstring(version)))
+			},
+			Entry("empty", ""),
+			Entry("three components", "100.95.104"),
+			Entry("five components", "100.95.104.26200.1"),
+			Entry("build is not decimal", "100.95.104.x"),
+			Entry("build is hex", "100.95.104.0x26200"),
+			Entry("build wider than 16 bits", "100.95.104.70000"),
+			Entry("negative build", "100.95.104.-1"),
+			Entry("empty build", "100.95.104."),
+		)
+	})
 })

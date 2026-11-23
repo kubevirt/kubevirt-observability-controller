@@ -74,7 +74,7 @@ var _ = Describe("PrometheusRule Reconciliation", func() {
 		pr, err := rules.GetPrometheusRule(kvNamespace, prometheusRuleName)
 		Expect(err).ToNot(HaveOccurred())
 		Expect(rules.RecordingRuleNames(pr)).To(ConsistOf(
-			"vmi:kubevirt_vmi_guest_device_driver_timestamp_seconds:max",
+			"vmi:kubevirt_vmi_guest_device_driver_build_number:max",
 		))
 	})
 

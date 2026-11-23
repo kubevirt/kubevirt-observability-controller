@@ -27,12 +27,12 @@ import (
 )
 
 var (
-	latestVersionInfo = operatormetrics.NewGaugeVec(
+	minimumBuildNumber = operatormetrics.NewGaugeVec(
 		operatormetrics.MetricOpts{
-			Name:        "kubevirt_guest_device_driver_latest_version_info",
+			Name:        "kubevirt_guest_device_driver_minimum_build_number",
 			ExtraFields: groups.Tag(groups.GuestDrivers),
-			Help: "Latest available guest device driver version for a device and " +
-				"guest OS version, as declared in the guest device drivers ConfigMap.",
+			Help: "Minimum guest device driver build number for a device and guest OS " +
+				"version, as declared in the guest device drivers ConfigMap.",
 		},
 		[]string{"device_id", "guest_os_version_id", "driver_version", "device_name"},
 	)
@@ -68,7 +68,7 @@ func RegisterCollector(cache *DriversCache, allowlist map[string]bool) error {
 // AllMetrics returns every guest device driver metric before filtering, so the
 // selection layer can read group membership without registering the collector.
 func AllMetrics() []operatormetrics.Metric {
-	return []operatormetrics.Metric{latestVersionInfo, configInvalid}
+	return []operatormetrics.Metric{minimumBuildNumber, configInvalid}
 }
 
 func driversCollector(cache *DriversCache) operatormetrics.Collector {
@@ -85,14 +85,14 @@ func driversCollector(cache *DriversCache) operatormetrics.Collector {
 
 			for _, entry := range entries {
 				crs = append(crs, operatormetrics.CollectorResult{
-					Metric: latestVersionInfo,
+					Metric: minimumBuildNumber,
 					Labels: []string{
 						entry.DeviceID,
 						entry.GuestOSVersionID,
 						entry.DriverVersion,
 						entry.DeviceName,
 					},
-					Value: 1.0,
+					Value: float64(entry.BuildNumber),
 				})
 			}
 

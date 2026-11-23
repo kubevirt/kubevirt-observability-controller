@@ -371,14 +371,14 @@ var vmiHotplugAlerts = []promv1.Rule{
 var guestDriverAlerts = []promv1.Rule{
 	{
 		Alert: "OutdatedGuestDeviceDrivers",
-		Expr:  intstr.FromString(withVMLabel("vmi:kubevirt_vmi_guest_device_driver_timestamp_seconds:max{namespace!=''}")),
+		Expr:  intstr.FromString(withVMLabel("vmi:kubevirt_vmi_guest_device_driver_build_number:max{namespace!=''}")),
 		For:   ptr.To(promv1.Duration("1h")),
 		Annotations: map[string]string{
-			summaryAnnotationKey: "A guest device driver is outdated: its installed version is not the latest " +
-				"known version for that device and guest OS version.",
+			summaryAnnotationKey: "A guest device driver is outdated: its installed build is below the minimum " +
+				"known build for that device and guest OS version.",
 			descriptionAnnotationKey: "VirtualMachine {{ $labels.name }} in namespace {{ $labels.namespace }} " +
 				"is running driver {{ $labels.driver_name }} version {{ $labels.driver_version }}, " +
-				"which is outdated for guest OS version {{ $labels.guest_os_version_id }}.",
+				"which is below the minimum for guest OS version {{ $labels.guest_os_version_id }}.",
 		},
 		Labels: map[string]string{
 			severityAlertLabelKey:        "warning",

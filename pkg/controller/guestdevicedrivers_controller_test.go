@@ -35,11 +35,11 @@ import (
 )
 
 const testDriversYAML = `
-version: v1alpha1
+version: v1alpha2
 devices:
   - deviceID: "1041"
     deviceName: "VirtIO network device"
-    current:
+    minimum:
       - guestOSVersionID: "2022"
         driverVersion: "100.95.104.26200"
       - guestOSVersionID: "2019"
@@ -99,18 +99,18 @@ var _ = Describe("GuestDeviceDrivers controller", func() {
 		Expect(cache.List()).To(ConsistOf(
 			devicedrivers.DriverEntry{
 				DeviceID: "1041", DeviceName: "VirtIO network device",
-				GuestOSVersionID: "2022", DriverVersion: "100.95.104.26200",
+				GuestOSVersionID: "2022", DriverVersion: "100.95.104.26200", BuildNumber: 26200,
 			},
 			devicedrivers.DriverEntry{
 				DeviceID: "1041", DeviceName: "VirtIO network device",
-				GuestOSVersionID: "2019", DriverVersion: "100.94.104.25200",
+				GuestOSVersionID: "2019", DriverVersion: "100.94.104.25200", BuildNumber: 25200,
 			},
 		))
 	})
 
 	It("should clear the cache when the ConfigMap does not exist", func() {
 		cache.Store([]devicedrivers.DriverEntry{
-			{DeviceID: "1041", GuestOSVersionID: "2019", DriverVersion: "100.94.104.25200"},
+			{DeviceID: "1041", GuestOSVersionID: "2019", DriverVersion: "100.94.104.25200", BuildNumber: 25200},
 		})
 		r := reconcilerFor()
 
@@ -122,7 +122,7 @@ var _ = Describe("GuestDeviceDrivers controller", func() {
 
 	It("should keep the last valid entries when the ConfigMap becomes unparseable", func() {
 		previous := []devicedrivers.DriverEntry{
-			{DeviceID: "1041", GuestOSVersionID: "2019", DriverVersion: "100.94.104.25200"},
+			{DeviceID: "1041", GuestOSVersionID: "2019", DriverVersion: "100.94.104.25200", BuildNumber: 25200},
 		}
 		cache.Store(previous)
 		r := reconcilerFor(driversConfigMap(map[string]string{
@@ -138,7 +138,7 @@ var _ = Describe("GuestDeviceDrivers controller", func() {
 
 	It("should keep the last valid entries when the drivers key is missing", func() {
 		previous := []devicedrivers.DriverEntry{
-			{DeviceID: "1041", GuestOSVersionID: "2019", DriverVersion: "100.94.104.25200"},
+			{DeviceID: "1041", GuestOSVersionID: "2019", DriverVersion: "100.94.104.25200", BuildNumber: 25200},
 		}
 		cache.Store(previous)
 		r := reconcilerFor(driversConfigMap(map[string]string{"other.yaml": "ignored"}))

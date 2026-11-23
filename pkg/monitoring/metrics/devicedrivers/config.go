@@ -27,13 +27,14 @@ import (
 	"github.com/kubevirt/kubevirt-observability-controller/pkg/monitoring/metrics"
 )
 
-const SupportedVersion = "v1alpha1"
+const SupportedVersion = "v1alpha2"
 
 type DriverEntry struct {
 	DeviceID         string
 	DeviceName       string
 	GuestOSVersionID string
 	DriverVersion    string
+	BuildNumber      uint16
 }
 
 type driversConfig struct {
@@ -44,12 +45,17 @@ type driversConfig struct {
 type deviceConfig struct {
 	DeviceID   string          `json:"deviceID"`
 	DeviceName string          `json:"deviceName"`
-	Current    []driverVersion `json:"current"`
+	Minimum    []driverVersion `json:"minimum"`
 }
 
 type driverVersion struct {
 	GuestOSVersionID string `json:"guestOSVersionID"`
 	DriverVersion    string `json:"driverVersion"`
+}
+
+type minimumKey struct {
+	deviceID         string
+	guestOSVersionID string
 }
 
 func Parse(data []byte) ([]DriverEntry, error) {
@@ -66,7 +72,7 @@ func Parse(data []byte) ([]DriverEntry, error) {
 	}
 
 	var entries []DriverEntry
-	seen := make(map[DriverEntry]bool)
+	seen := make(map[minimumKey]bool)
 
 	for i, device := range cfg.Devices {
 		deviceID, err := metrics.NormalizeDeviceID(device.DeviceID)
@@ -74,11 +80,11 @@ func Parse(data []byte) ([]DriverEntry, error) {
 			return nil, fmt.Errorf("device %d in drivers config: %w", i, err)
 		}
 
-		if len(device.Current) == 0 {
-			return nil, fmt.Errorf("device %q in drivers config declares no current driver versions", deviceID)
+		if len(device.Minimum) == 0 {
+			return nil, fmt.Errorf("device %q in drivers config declares no minimum driver versions", deviceID)
 		}
 
-		for _, version := range device.Current {
+		for _, version := range device.Minimum {
 			// Both are compared against guest agent values as exact label matches,
 			// so stray whitespace here would silently never match.
 			guestOSVersionID := strings.TrimSpace(version.GuestOSVersionID)
@@ -95,19 +101,30 @@ func Parse(data []byte) ([]DriverEntry, error) {
 				)
 			}
 
-			entry := DriverEntry{
+			buildNumber, err := metrics.DriverBuildNumber(driverVersion)
+			if err != nil {
+				return nil, fmt.Errorf(
+					"device %q, guest OS version %q in drivers config: %w",
+					deviceID, guestOSVersionID, err,
+				)
+			}
+
+			key := minimumKey{deviceID: deviceID, guestOSVersionID: guestOSVersionID}
+			if seen[key] {
+				return nil, fmt.Errorf(
+					"device %q in drivers config declares more than one minimum for guest OS version %q",
+					deviceID, guestOSVersionID,
+				)
+			}
+			seen[key] = true
+
+			entries = append(entries, DriverEntry{
 				DeviceID:         deviceID,
 				DeviceName:       device.DeviceName,
 				GuestOSVersionID: guestOSVersionID,
 				DriverVersion:    driverVersion,
-			}
-
-			if seen[entry] {
-				continue
-			}
-			seen[entry] = true
-
-			entries = append(entries, entry)
+				BuildNumber:      buildNumber,
+			})
 		}
 	}
 

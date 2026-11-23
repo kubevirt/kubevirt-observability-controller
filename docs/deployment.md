@@ -113,7 +113,7 @@ widening the metrics default would duplicate them.
 
 Each entry is either a group name or an individual item name, so
 `--metrics-allowlist=guest-drivers` and
-`--metrics-allowlist=kubevirt_vmi_guest_device_driver_timestamp_seconds` are
+`--metrics-allowlist=kubevirt_vmi_guest_device_driver_build_number` are
 both valid. Absolute and relative forms cannot be mixed in one value, and an
 entry that names neither a known group nor a known item of that type stops
 the controller at startup.

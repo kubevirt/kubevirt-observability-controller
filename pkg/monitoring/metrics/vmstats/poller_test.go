@@ -315,7 +315,7 @@ var _ = Describe("Poller", func() {
 			p := NewPoller(PollerConfig{
 				MaxConcurrent: 10,
 				Policy: NewRequestPolicy(map[string]bool{
-					"kubevirt_vmi_guest_device_driver_timestamp_seconds": true,
+					"kubevirt_vmi_guest_device_driver_build_number": true,
 				}),
 			}, statsCache, vmClient, vmiStore, podStore)
 			p.pollOnce()
@@ -361,7 +361,7 @@ var _ = Describe("Poller", func() {
 			p := NewPoller(PollerConfig{
 				MaxConcurrent: 10,
 				Policy: NewRequestPolicy(map[string]bool{
-					"kubevirt_vmi_guest_device_driver_timestamp_seconds": true,
+					"kubevirt_vmi_guest_device_driver_build_number": true,
 				}),
 			}, NewStatsCache(), vmClient, vmiStore, podStore)
 			p.pollOnce()
@@ -409,7 +409,7 @@ var _ = Describe("Poller", func() {
 				p := NewPoller(PollerConfig{
 					MaxConcurrent: 10,
 					Policy: NewRequestPolicy(map[string]bool{
-						"kubevirt_vmi_guest_device_driver_timestamp_seconds": true,
+						"kubevirt_vmi_guest_device_driver_build_number": true,
 					}),
 				}, NewStatsCache(), vmClient, vmiStore, podStore)
 
@@ -467,7 +467,7 @@ var _ = Describe("Poller", func() {
 			p := NewPoller(PollerConfig{
 				MaxConcurrent: 10,
 				Policy: NewRequestPolicy(map[string]bool{
-					"kubevirt_vmi_guest_device_driver_timestamp_seconds": true,
+					"kubevirt_vmi_guest_device_driver_build_number": true,
 				}),
 			}, NewStatsCache(), vmClient, vmiStore, podStore)
 
