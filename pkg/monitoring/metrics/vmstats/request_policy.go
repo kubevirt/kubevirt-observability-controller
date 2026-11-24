@@ -100,6 +100,11 @@ func NewRequestPolicy(allowlist map[string]bool) *RequestPolicy {
 			}
 		}
 	}
+
+	// Custom Prometheus collectors are not part of categoryMetrics.
+	if allowlist[blockIOLatencyMetricName] {
+		allowed[catDomainStats] = true
+	}
 	return &RequestPolicy{allowed: allowed}
 }
 
