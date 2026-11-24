@@ -1,0 +1,56 @@
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: controller-manager-np
+  labels:
+    app.kubernetes.io/name: virt-observability-controller
+spec:
+  podSelector:
+    matchLabels:
+      control-plane: controller-manager
+      app.kubernetes.io/name: virt-observability-controller
+  policyTypes:
+  - Ingress
+  - Egress
+  ingress:
+  - ports:
+    - protocol: TCP
+      port: 8443
+  egress:
+  - ports:
+    - protocol: TCP
+      port: 6443
+  # OpenShift and vanilla Kubernetes place DNS in different namespaces on
+  # different ports. A rule whose peers match nothing permits nothing, so both
+  # can be shipped unconditionally.
+  - ports:
+    - protocol: TCP
+      port: 5353
+    - protocol: UDP
+      port: 5353
+    to:
+    - namespaceSelector:
+        matchLabels:
+          kubernetes.io/metadata.name: openshift-dns
+      podSelector:
+        matchLabels:
+          dns.operator.openshift.io/daemonset-dns: default
+  - ports:
+    - protocol: TCP
+      port: 53
+    - protocol: UDP
+      port: 53
+    to:
+    - namespaceSelector:
+        matchLabels:
+          kubernetes.io/metadata.name: kube-system
+      podSelector:
+        matchLabels:
+          k8s-app: kube-dns
+  - ports:
+    - protocol: TCP
+      port: 8187
+    to:
+    - podSelector:
+        matchLabels:
+          kubevirt.io: virt-handler

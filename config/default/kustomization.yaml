@@ -4,6 +4,7 @@ namePrefix: virt-observability-controller-
 resources:
 - ../rbac
 - ../manager
+- ../network-policy
 
 patches:
 - path: manager_metrics_patch.yaml
