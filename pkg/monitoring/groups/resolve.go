@@ -67,7 +67,7 @@ const (
 //
 // The second return value lists entries that resolved to nothing. The three
 // flags share one group vocabulary, so naming a group with no items of this
-// artifact type — inventory has no alerts — is legal rather than an error,
+// artifact type — vmi-network has no alerts — is legal rather than an error,
 // but it is worth telling the operator about: on its own it produces an empty
 // selection that looks like the typo this function otherwise rejects.
 func Resolve(index map[string]Name, raw string, defaulting Defaulting) (map[string]bool, []string, error) {
