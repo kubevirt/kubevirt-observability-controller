@@ -30,29 +30,27 @@ import (
 )
 
 const (
-	driverVersionMetric       = "kubevirt_guest_device_driver_latest_version_info"
+	driverMinimumMetric       = "kubevirt_guest_device_driver_minimum_build_number"
 	driverConfigInvalidMetric = "kubevirt_guest_device_driver_config_invalid"
 
 	virtioNetDeviceName = "VirtIO network device"
 )
 
-const initialDriversYAML = `version: v1alpha1
+const initialDriversYAML = `version: v1alpha2
 devices:
   - deviceID: "1041"
     deviceName: "VirtIO network device"
-    current:
+    minimum:
       - guestOSVersionID: "2022"
         driverVersion: "100.95.104.26200"
-      - guestOSVersionID: "2022"
-        driverVersion: "100.95.104.26100"
       - guestOSVersionID: "2019"
         driverVersion: "100.94.104.25200"`
 
-const updatedDriversYAML = `version: v1alpha1
+const updatedDriversYAML = `version: v1alpha2
 devices:
   - deviceID: "1041"
     deviceName: "VirtIO network device"
-    current:
+    minimum:
       - guestOSVersionID: "2022"
         driverVersion: "100.95.104.26300"`
 
@@ -60,7 +58,7 @@ const rejectedDriversYAML = `version: v99
 devices:
   - deviceID: "1041"
     deviceName: "VirtIO network device"
-    current:
+    minimum:
       - guestOSVersionID: "2022"
         driverVersion: "100.95.104.26400"`
 
@@ -69,6 +67,7 @@ type driverSeries struct {
 	DeviceName       string
 	GuestOSVersionID string
 	DriverVersion    string
+	BuildNumber      string
 }
 
 func driverVersions() ([]driverSeries, error) {
@@ -78,12 +77,13 @@ func driverVersions() ([]driverSeries, error) {
 	}
 
 	var series []driverSeries
-	for _, line := range metrics.FindMetric(output, driverVersionMetric) {
+	for _, line := range metrics.FindMetric(output, driverMinimumMetric) {
 		series = append(series, driverSeries{
 			DeviceID:         line.Labels["device_id"],
 			DeviceName:       line.Labels["device_name"],
 			GuestOSVersionID: line.Labels["guest_os_version_id"],
 			DriverVersion:    line.Labels["driver_version"],
+			BuildNumber:      line.Value,
 		})
 	}
 
@@ -111,19 +111,15 @@ var _ = Describe("Guest Device Driver Versions", Ordered, func() {
 		DeferCleanup(lib.DeleteGuestDriversConfigMap, kvNamespace)
 	})
 
-	It("should expose one series per configured driver version", func() {
+	It("should expose one series per configured minimum, valued at its build number", func() {
 		Eventually(driverVersions, 2*time.Minute, 5*time.Second).Should(ConsistOf(
 			driverSeries{
 				DeviceID: "1041", DeviceName: virtioNetDeviceName,
-				GuestOSVersionID: "2022", DriverVersion: "100.95.104.26200",
+				GuestOSVersionID: "2022", DriverVersion: "100.95.104.26200", BuildNumber: "26200",
 			},
 			driverSeries{
 				DeviceID: "1041", DeviceName: virtioNetDeviceName,
-				GuestOSVersionID: "2022", DriverVersion: "100.95.104.26100",
-			},
-			driverSeries{
-				DeviceID: "1041", DeviceName: virtioNetDeviceName,
-				GuestOSVersionID: "2019", DriverVersion: "100.94.104.25200",
+				GuestOSVersionID: "2019", DriverVersion: "100.94.104.25200", BuildNumber: "25200",
 			},
 		))
 	})
@@ -134,7 +130,7 @@ var _ = Describe("Guest Device Driver Versions", Ordered, func() {
 		Eventually(driverVersions, 2*time.Minute, 5*time.Second).Should(ConsistOf(
 			driverSeries{
 				DeviceID: "1041", DeviceName: virtioNetDeviceName,
-				GuestOSVersionID: "2022", DriverVersion: "100.95.104.26300",
+				GuestOSVersionID: "2022", DriverVersion: "100.95.104.26300", BuildNumber: "26300",
 			},
 		))
 	})
@@ -146,7 +142,7 @@ var _ = Describe("Guest Device Driver Versions", Ordered, func() {
 		Expect(driverVersions()).To(ConsistOf(
 			driverSeries{
 				DeviceID: "1041", DeviceName: virtioNetDeviceName,
-				GuestOSVersionID: "2022", DriverVersion: "100.95.104.26300",
+				GuestOSVersionID: "2022", DriverVersion: "100.95.104.26300", BuildNumber: "26300",
 			},
 		))
 	})

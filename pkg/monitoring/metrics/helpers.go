@@ -205,6 +205,31 @@ func NormalizeDeviceID(deviceID string) (string, error) {
 	return FormatDeviceID(uint16(parsed)), nil
 }
 
+// DriverBuildNumber returns the last of the four components of a Windows driver
+// version. For virtio-win that component is the driver build and increases with
+// every build; the first three do not order builds.
+func DriverBuildNumber(version string) (uint16, error) {
+	const malformed = "%q is not a driver version of four 16-bit decimal components"
+
+	parts := strings.Split(strings.TrimSpace(version), ".")
+	if len(parts) != 4 {
+		return 0, fmt.Errorf(malformed, version)
+	}
+
+	for _, part := range parts[:3] {
+		if _, err := strconv.ParseUint(part, 10, 16); err != nil {
+			return 0, fmt.Errorf(malformed, version)
+		}
+	}
+
+	build, err := strconv.ParseUint(parts[3], 10, 16)
+	if err != nil {
+		return 0, fmt.Errorf(malformed, version)
+	}
+
+	return uint16(build), nil
+}
+
 func GetBinding(iface k6tv1.Interface) (bindingType, bindingName string) {
 	switch {
 	case iface.Masquerade != nil:

@@ -24,17 +24,15 @@ import (
 )
 
 var _ = Describe("Parse", func() {
-	It("should return one entry per device, guest OS version and driver version", func() {
+	It("should return one entry per device and guest OS version, carrying the build number", func() {
 		entries, err := Parse([]byte(`
-version: v1alpha1
+version: v1alpha2
 devices:
   - deviceID: "1041"
     deviceName: "VirtIO network device"
-    current:
+    minimum:
       - guestOSVersionID: "2022"
         driverVersion: "100.95.104.26200"
-      - guestOSVersionID: "2022"
-        driverVersion: "100.95.104.26100"
       - guestOSVersionID: "2019"
         driverVersion: "100.94.104.25200"
 `))
@@ -43,61 +41,63 @@ devices:
 		Expect(entries).To(ConsistOf(
 			DriverEntry{
 				DeviceID: "1041", DeviceName: "VirtIO network device",
-				GuestOSVersionID: "2022", DriverVersion: "100.95.104.26200",
+				GuestOSVersionID: "2022", DriverVersion: "100.95.104.26200", BuildNumber: 26200,
 			},
 			DriverEntry{
 				DeviceID: "1041", DeviceName: "VirtIO network device",
-				GuestOSVersionID: "2022", DriverVersion: "100.95.104.26100",
-			},
-			DriverEntry{
-				DeviceID: "1041", DeviceName: "VirtIO network device",
-				GuestOSVersionID: "2019", DriverVersion: "100.94.104.25200",
+				GuestOSVersionID: "2019", DriverVersion: "100.94.104.25200", BuildNumber: 25200,
 			},
 		))
 	})
 
 	It("should keep entries whose device name is missing", func() {
 		entries, err := Parse([]byte(`
-version: v1alpha1
+version: v1alpha2
 devices:
   - deviceID: "1041"
-    current:
+    minimum:
       - guestOSVersionID: "2022"
         driverVersion: "100.95.104.26200"
 `))
 
 		Expect(err).ToNot(HaveOccurred())
 		Expect(entries).To(ConsistOf(
-			DriverEntry{DeviceID: "1041", GuestOSVersionID: "2022", DriverVersion: "100.95.104.26200"},
+			DriverEntry{
+				DeviceID: "1041", GuestOSVersionID: "2022",
+				DriverVersion: "100.95.104.26200", BuildNumber: 26200,
+			},
 		))
 	})
 
 	It("should normalize device IDs to the form the device metric labels them with", func() {
 		entries, err := Parse([]byte(`
-version: v1alpha1
+version: v1alpha2
 devices:
   - deviceID: "0x104a"
-    current:
+    minimum:
       - guestOSVersionID: "2022"
         driverVersion: "100.95.104.26200"
 `))
 
 		Expect(err).ToNot(HaveOccurred())
 		Expect(entries).To(ConsistOf(
-			DriverEntry{DeviceID: "104a", GuestOSVersionID: "2022", DriverVersion: "100.95.104.26200"},
+			DriverEntry{
+				DeviceID: "104a", GuestOSVersionID: "2022",
+				DriverVersion: "100.95.104.26200", BuildNumber: 26200,
+			},
 		))
 	})
 
 	It("should reject a config whose device ID is not a device ID", func() {
 		_, err := Parse([]byte(`
-version: v1alpha1
+version: v1alpha2
 devices:
   - deviceID: "1041"
-    current:
+    minimum:
       - guestOSVersionID: "2022"
         driverVersion: "100.95.104.26200"
   - deviceID: "virtio-net"
-    current:
+    minimum:
       - guestOSVersionID: "2022"
         driverVersion: "100.95.104.26200"
 `))
@@ -105,12 +105,12 @@ devices:
 		Expect(err).To(MatchError(ContainSubstring("virtio-net")))
 	})
 
-	It("should reject a config whose version is not v1alpha1", func() {
+	It("should reject a config whose version is not v1alpha2", func() {
 		_, err := Parse([]byte(`
 version: v2
 devices:
   - deviceID: "1041"
-    current:
+    minimum:
       - guestOSVersionID: "2022"
         driverVersion: "100.95.104.26200"
 `))
@@ -120,10 +120,10 @@ devices:
 
 	It("should reject a config whose device ID is missing", func() {
 		_, err := Parse([]byte(`
-version: v1alpha1
+version: v1alpha2
 devices:
   - deviceID: ""
-    current:
+    minimum:
       - guestOSVersionID: "2022"
         driverVersion: "100.95.104.26200"
 `))
@@ -133,10 +133,10 @@ devices:
 
 	It("should reject a config whose guest OS version is missing", func() {
 		_, err := Parse([]byte(`
-version: v1alpha1
+version: v1alpha2
 devices:
   - deviceID: "1041"
-    current:
+    minimum:
       - guestOSVersionID: ""
         driverVersion: "100.95.104.26200"
 `))
@@ -146,10 +146,10 @@ devices:
 
 	It("should reject a config whose driver version is missing", func() {
 		_, err := Parse([]byte(`
-version: v1alpha1
+version: v1alpha2
 devices:
   - deviceID: "1041"
-    current:
+    minimum:
       - guestOSVersionID: "2022"
         driverVersion: ""
 `))
@@ -159,26 +159,29 @@ devices:
 
 	It("should trim surrounding whitespace off the values it labels series with", func() {
 		entries, err := Parse([]byte(`
-version: v1alpha1
+version: v1alpha2
 devices:
   - deviceID: "1041"
-    current:
+    minimum:
       - guestOSVersionID: " 2022 "
         driverVersion: " 100.95.104.26200 "
 `))
 
 		Expect(err).ToNot(HaveOccurred())
 		Expect(entries).To(ConsistOf(
-			DriverEntry{DeviceID: "1041", GuestOSVersionID: "2022", DriverVersion: "100.95.104.26200"},
+			DriverEntry{
+				DeviceID: "1041", GuestOSVersionID: "2022",
+				DriverVersion: "100.95.104.26200", BuildNumber: 26200,
+			},
 		))
 	})
 
 	It("should reject a driver version that is only whitespace", func() {
 		_, err := Parse([]byte(`
-version: v1alpha1
+version: v1alpha2
 devices:
   - deviceID: "1041"
-    current:
+    minimum:
       - guestOSVersionID: "2022"
         driverVersion: "   "
 `))
@@ -186,59 +189,69 @@ devices:
 		Expect(err).To(MatchError(ContainSubstring("driverVersion")))
 	})
 
-	It("should reject a device that declares no current driver versions", func() {
+	It("should reject a device that declares no minimum driver versions", func() {
 		_, err := Parse([]byte(`
-version: v1alpha1
+version: v1alpha2
 devices:
   - deviceID: "1041"
 `))
 
-		Expect(err).To(MatchError(ContainSubstring("no current driver versions")))
+		Expect(err).To(MatchError(ContainSubstring("no minimum driver versions")))
+	})
+
+	It("should reject a driver version with no build number", func() {
+		_, err := Parse([]byte(`
+version: v1alpha2
+devices:
+  - deviceID: "1041"
+    minimum:
+      - guestOSVersionID: "2022"
+        driverVersion: "100.95.104.70000"
+`))
+
+		Expect(err).To(MatchError(ContainSubstring("100.95.104.70000")))
 	})
 
 	It("should reject a config with a misspelled field", func() {
 		_, err := Parse([]byte(`
-version: v1alpha1
+version: v1alpha2
 devices:
   - deviceID: "1041"
-    currrent:
+    minnimum:
       - guestOSVersionID: "2022"
         driverVersion: "100.95.104.26200"
 `))
 
-		Expect(err).To(MatchError(ContainSubstring("currrent")))
+		Expect(err).To(MatchError(ContainSubstring("minnimum")))
 	})
 
 	It("should reject a config with a duplicated field", func() {
 		_, err := Parse([]byte(`
-version: v1alpha1
-version: v1alpha1
+version: v1alpha2
+version: v1alpha2
 devices: []
 `))
 
 		Expect(err).To(HaveOccurred())
 	})
 
-	It("should collapse duplicate tuples into a single entry", func() {
-		entries, err := Parse([]byte(`
-version: v1alpha1
+	It("should reject a second minimum for the same device and guest OS version", func() {
+		_, err := Parse([]byte(`
+version: v1alpha2
 devices:
   - deviceID: "1041"
-    current:
+    minimum:
       - guestOSVersionID: "2022"
         driverVersion: "100.95.104.26200"
       - guestOSVersionID: "2022"
-        driverVersion: "100.95.104.26200"
+        driverVersion: "100.95.104.26100"
 `))
 
-		Expect(err).ToNot(HaveOccurred())
-		Expect(entries).To(ConsistOf(
-			DriverEntry{DeviceID: "1041", GuestOSVersionID: "2022", DriverVersion: "100.95.104.26200"},
-		))
+		Expect(err).To(MatchError(ContainSubstring("more than one minimum")))
 	})
 
 	It("should return an error for malformed YAML", func() {
-		_, err := Parse([]byte("version: v1alpha1\ndevices: [oops"))
+		_, err := Parse([]byte("version: v1alpha2\ndevices: [oops"))
 
 		Expect(err).To(HaveOccurred())
 	})

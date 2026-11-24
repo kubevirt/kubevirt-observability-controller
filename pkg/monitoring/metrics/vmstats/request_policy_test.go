@@ -127,7 +127,7 @@ var _ = Describe("resolveVMStatsRequest", func() {
 var _ = Describe("RequestPolicy.Resolve under a restricted allowlist", func() {
 	deviceOnly := func() *RequestPolicy {
 		return NewRequestPolicy(map[string]bool{
-			"kubevirt_vmi_guest_device_driver_timestamp_seconds": true,
+			"kubevirt_vmi_guest_device_driver_build_number": true,
 		})
 	}
 
@@ -224,7 +224,7 @@ var _ = Describe("NewRequestPolicy", func() {
 
 	It("allows only guest-get-devices for a device-driver-only allowlist", func() {
 		policy := NewRequestPolicy(map[string]bool{
-			"kubevirt_vmi_guest_device_driver_timestamp_seconds": true,
+			"kubevirt_vmi_guest_device_driver_build_number": true,
 		})
 
 		Expect(policy.allows(catGuestGetDevices)).To(BeTrue())

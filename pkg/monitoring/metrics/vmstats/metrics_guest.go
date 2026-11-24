@@ -36,7 +36,7 @@ var (
 	guestMetricsList = []operatormetrics.Metric{
 		guestHostname, guestTimezone,
 		guestUserCount, filesystemCapacityBytes, filesystemUsedBytes,
-		guestDeviceDriverTimestamp,
+		guestDeviceDriverBuildNumber,
 	}
 
 	guestHostname = operatormetrics.NewGauge(operatormetrics.MetricOpts{
@@ -64,10 +64,10 @@ var (
 		ExtraFields: groups.Tag(groups.GuestFilesystem),
 		Help:        "Used VM filesystem capacity in bytes.",
 	})
-	guestDeviceDriverTimestamp = operatormetrics.NewGauge(operatormetrics.MetricOpts{
-		Name:        "kubevirt_vmi_guest_device_driver_timestamp_seconds",
+	guestDeviceDriverBuildNumber = operatormetrics.NewGauge(operatormetrics.MetricOpts{
+		Name:        "kubevirt_vmi_guest_device_driver_build_number",
 		ExtraFields: groups.Tag(groups.GuestDrivers),
-		Help: "Release date of the driver of a guest device, in seconds since the epoch, " +
+		Help: "Build number of the driver of a guest device, the last component of its version, " +
 			"as reported by the guest agent. Windows guests only.",
 	})
 )
@@ -195,7 +195,11 @@ func collectGuestDevices(report *VMIReport) []operatormetrics.CollectorResult {
 	var crs []operatormetrics.CollectorResult
 	seen := make(map[deviceKey]struct{}, len(devices))
 	for _, d := range devices {
-		if d.DriverDate == nil || *d.DriverDate <= 0 {
+		build, err := metrics.DriverBuildNumber(d.DriverVersion)
+		if err != nil {
+			guestLog.V(2).Info("dropping guest device whose driver version has no build number",
+				"namespace", report.VMI.Namespace, "name", report.VMI.Name,
+				"driver_name", d.DriverName, "driver_version", d.DriverVersion)
 			continue
 		}
 		key := deviceKey{
@@ -215,7 +219,7 @@ func collectGuestDevices(report *VMIReport) []operatormetrics.CollectorResult {
 		seen[key] = struct{}{}
 
 		crs = append(crs, report.newCollectorResultWithLabels(
-			guestDeviceDriverTimestamp, nanosecondsToSeconds(uint64(*d.DriverDate)), map[string]string{
+			guestDeviceDriverBuildNumber, float64(build), map[string]string{
 				"driver_name":         key.name,
 				"driver_version":      key.version,
 				"device_id":           key.deviceID,
@@ -227,7 +231,6 @@ func collectGuestDevices(report *VMIReport) []operatormetrics.CollectorResult {
 
 type guestDevice struct {
 	DriverName    string `json:"driver-name"`
-	DriverDate    *int64 `json:"driver-date"`
 	DriverVersion string `json:"driver-version"`
 	ID            *struct {
 		DeviceID *int64 `json:"device-id"`

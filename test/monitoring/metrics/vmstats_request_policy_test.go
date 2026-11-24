@@ -79,7 +79,7 @@ var _ = Describe("VMStats OS-based request policy", func() {
 			metricsOutput = out
 			return append(
 				scopedLines("kubevirt_vmi_guest_user_count"),
-				scopedLines("kubevirt_vmi_guest_device_driver_timestamp_seconds")...,
+				scopedLines("kubevirt_vmi_guest_device_driver_build_number")...,
 			)
 		}, 30*time.Second, 10*time.Second).Should(BeEmpty())
 	})

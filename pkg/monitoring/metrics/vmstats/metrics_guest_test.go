@@ -31,11 +31,12 @@ import (
 	"github.com/kubevirt/kubevirt-observability-controller/pkg/monitoring/metrics"
 )
 
-func device(driverDate int64, name, version string, deviceID int64) string {
+// The guest agent still reports driver-date; the metric ignores it.
+func device(name, version string, deviceID int64) string {
 	return fmt.Sprintf(
-		`{"driver-date":%d,"driver-name":%q,"driver-version":%q,`+
+		`{"driver-date":1651363200000000000,"driver-name":%q,"driver-version":%q,`+
 			`"id":{"device-id":%d,"vendor-id":6900,"type":"pci"}}`,
-		driverDate, name, version, deviceID)
+		name, version, deviceID)
 }
 
 func devicesPayload(devices ...string) string {
@@ -127,13 +128,13 @@ var _ = Describe("Guest Metrics", func() {
 
 	It("should parse GuestGetDevices", func() {
 		report.Stats.GuestGetDevices = devicesPayload(
-			device(1651363200000000000, "Red Hat VirtIO SCSI controller", "100.85.104.20800", 4162),
+			device("Red Hat VirtIO SCSI controller", "100.85.104.20800", 4162),
 		)
 
 		results := collectGuestDevices(report)
 
 		Expect(results).To(HaveLen(1))
-		Expect(results[0].Value).To(Equal(1651363200.0))
+		Expect(results[0].Value).To(Equal(20800.0))
 		labels := results[0].ConstLabels
 		Expect(labels).To(HaveKeyWithValue("driver_name", "Red Hat VirtIO SCSI controller"))
 		Expect(labels).To(HaveKeyWithValue("driver_version", "100.85.104.20800"))
@@ -143,23 +144,21 @@ var _ = Describe("Guest Metrics", func() {
 		Expect(labels).ToNot(HaveKey("device_type"))
 	})
 
-	It("should report labels the guest did not report as none", func() {
+	It("should report a device id the guest did not report as none", func() {
 		report.Stats.GuestGetDevices =
-			`{"return":[{"driver-date":1736726400000000000,"driver-name":"VirtIO Balloon Driver"}]}`
+			`{"return":[{"driver-name":"VirtIO Balloon Driver","driver-version":"100.85.104.20800"}]}`
 
 		results := collectGuestDevices(report)
 		Expect(results).To(HaveLen(1))
-		Expect(results[0].Value).To(Equal(1736726400.0))
 
 		labels := results[0].ConstLabels
 		Expect(labels).To(HaveKeyWithValue("driver_name", "VirtIO Balloon Driver"))
-		Expect(labels).To(HaveKeyWithValue("driver_version", noneLabelValue))
 		Expect(labels).To(HaveKeyWithValue("device_id", noneLabelValue))
 	})
 
 	It("should report a negative device id as none", func() {
 		report.Stats.GuestGetDevices = devicesPayload(
-			device(1736726400000000000, "VirtIO Balloon Driver", "100.85.104.20800", -1),
+			device("VirtIO Balloon Driver", "100.85.104.20800", -1),
 		)
 
 		results := collectGuestDevices(report)
@@ -169,10 +168,10 @@ var _ = Describe("Guest Metrics", func() {
 	})
 
 	It("should not emit duplicate series for devices reported twice", func() {
-		scsi := device(1771372800000000000, "Red Hat VirtIO SCSI controller", "100.103.104.29700", 4162)
+		scsi := device("Red Hat VirtIO SCSI controller", "100.103.104.29700", 4162)
 		report.Stats.GuestGetDevices = devicesPayload(
 			scsi,
-			device(1768953600000000000, "Red Hat VirtIO SCSI pass-through", "100.102.104.29500", 4168),
+			device("Red Hat VirtIO SCSI pass-through", "100.102.104.29500", 4168),
 			scsi,
 		)
 
@@ -180,17 +179,17 @@ var _ = Describe("Guest Metrics", func() {
 
 		Expect(results).To(HaveLen(2), "the repeated SCSI controller should be reported once")
 
-		Expect(results[0].Value).To(Equal(1771372800.0))
+		Expect(results[0].Value).To(Equal(29700.0))
 		Expect(results[0].ConstLabels).To(HaveKeyWithValue("device_id", "1042"))
 
-		Expect(results[1].Value).To(Equal(1768953600.0))
+		Expect(results[1].Value).To(Equal(29500.0))
 		Expect(results[1].ConstLabels).To(HaveKeyWithValue("device_id", "1048"))
 	})
 
 	It("should keep distinct devices that differ only by device id", func() {
 		report.Stats.GuestGetDevices = devicesPayload(
-			device(1771372800000000000, "Red Hat VirtIO SCSI controller", "100.103.104.29700", 4100),
-			device(1771372800000000000, "Red Hat VirtIO SCSI controller", "100.103.104.29700", 4162),
+			device("Red Hat VirtIO SCSI controller", "100.103.104.29700", 4100),
+			device("Red Hat VirtIO SCSI controller", "100.103.104.29700", 4162),
 		)
 
 		Expect(collectGuestDevices(report)).To(HaveLen(2))
@@ -199,7 +198,7 @@ var _ = Describe("Guest Metrics", func() {
 	DescribeTable("should label a device the way the drivers config normalizes the same id",
 		func(reported int64, written string) {
 			report.Stats.GuestGetDevices = devicesPayload(
-				device(1749427200000000000, "Red Hat VirtIO Ethernet Adapter", "100.101.104.28200", reported),
+				device("Red Hat VirtIO Ethernet Adapter", "100.101.104.28200", reported),
 			)
 
 			results := collectGuestDevices(report)
@@ -218,8 +217,8 @@ var _ = Describe("Guest Metrics", func() {
 
 	It("should keep device ids that collide only when truncated to uint16", func() {
 		report.Stats.GuestGetDevices = devicesPayload(
-			device(1749427200000000000, "Red Hat VirtIO Ethernet Adapter", "100.101.104.28200", 4161),
-			device(1749427200000000000, "Red Hat VirtIO Ethernet Adapter", "100.101.104.28200", 69697),
+			device("Red Hat VirtIO Ethernet Adapter", "100.101.104.28200", 4161),
+			device("Red Hat VirtIO Ethernet Adapter", "100.101.104.28200", 69697),
 		)
 
 		results := collectGuestDevices(report)
@@ -229,11 +228,13 @@ var _ = Describe("Guest Metrics", func() {
 		Expect(results[1].ConstLabels).To(HaveKeyWithValue("device_id", "11041"))
 	})
 
-	It("should skip devices without a usable driver date", func() {
+	It("should skip devices whose driver version has no build number", func() {
 		report.Stats.GuestGetDevices = `{"return":[
 		 {"driver-name":"VirtIO Input Driver","driver-version":"1","id":{"device-id":4178}},
-		 {"driver-date":0,"driver-name":"VirtIO Balloon Driver","id":{"device-id":4165}},
-		 {"driver-date":-1,"driver-name":"VirtIO Serial Driver","id":{"device-id":4163}}
+		 {"driver-name":"VirtIO Balloon Driver","id":{"device-id":4165}},
+		 {"driver-name":"VirtIO Serial Driver","driver-version":"100.100.104","id":{"device-id":4163}},
+		 {"driver-name":"VirtIO RNG Driver","driver-version":"100.100.104.27100.1","id":{"device-id":4133}},
+		 {"driver-name":"VirtIO SCSI Driver","driver-version":"100.100.104.70000","id":{"device-id":4162}}
 		]}`
 
 		Expect(collectGuestDevices(report)).To(BeEmpty())
@@ -241,7 +242,7 @@ var _ = Describe("Guest Metrics", func() {
 
 	It("should include GuestGetDevices in the collected guest metrics", func() {
 		report.Stats.GuestGetDevices = devicesPayload(
-			device(1736726400000000000, "VirtIO Serial Driver", "100.100.104.27100", 4163),
+			device("VirtIO Serial Driver", "100.100.104.27100", 4163),
 		)
 
 		results := collectGuestMetrics(report)
@@ -249,7 +250,7 @@ var _ = Describe("Guest Metrics", func() {
 		for _, r := range results {
 			names = append(names, r.Metric.GetOpts().Name)
 		}
-		Expect(names).To(ContainElement("kubevirt_vmi_guest_device_driver_timestamp_seconds"))
+		Expect(names).To(ContainElement("kubevirt_vmi_guest_device_driver_build_number"))
 	})
 
 	It("should skip malformed GuestGetDevices JSON gracefully", func() {

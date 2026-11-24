@@ -140,19 +140,18 @@ var vmiRecordingRules = []operatorrules.RecordingRule{
 	},
 	{
 		MetricsOpts: operatormetrics.MetricOpts{
-			Name:        "vmi:kubevirt_vmi_guest_device_driver_timestamp_seconds:max",
+			Name:        "vmi:kubevirt_vmi_guest_device_driver_build_number:max",
 			ExtraFields: groups.Tag(groups.GuestDrivers),
-			Help: "One series per outdated (VMI, device) pair: the installed guest device driver version does not " +
-				"match the latest version known for that device and guest OS version.",
+			Help: "One series per outdated (VMI, device) pair, valued at the installed build number: the installed " +
+				"guest device driver build is below the minimum known for that device and guest OS version.",
 		},
 		MetricType: operatormetrics.GaugeType,
 		Expr: intstr.FromString(
 			"max by (namespace, name, device_id, driver_name, driver_version, guest_os_version_id) (" +
-				"kubevirt_vmi_guest_device_driver_timestamp_seconds " +
-				"and on (device_id, guest_os_version_id) " +
-				"kubevirt_guest_device_driver_latest_version_info " +
-				"unless on (device_id, guest_os_version_id, driver_version) " +
-				"kubevirt_guest_device_driver_latest_version_info)",
+				"kubevirt_vmi_guest_device_driver_build_number) " +
+				"< on (device_id, guest_os_version_id) group_left " +
+				"max by (device_id, guest_os_version_id) (" +
+				"kubevirt_guest_device_driver_minimum_build_number)",
 		),
 	},
 }

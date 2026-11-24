@@ -80,7 +80,7 @@ virt-handler keeps exporting its own metrics either way. See
 --metrics-allowlist=guest-drivers
 
 # exactly one metric
---metrics-allowlist=kubevirt_vmi_guest_device_driver_timestamp_seconds
+--metrics-allowlist=kubevirt_vmi_guest_device_driver_build_number
 ```
 
 Each entry is a group name or an individual item name. A bare list is

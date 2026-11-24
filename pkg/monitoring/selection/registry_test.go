@@ -109,8 +109,8 @@ var _ = Describe("Default selection", func() {
 	It("exposes exactly the metrics KubeVirt does not publish", func() {
 		Expect(selected(metricIndex(), "")).To(ConsistOf(
 			// guest-drivers
-			"kubevirt_vmi_guest_device_driver_timestamp_seconds",
-			"kubevirt_guest_device_driver_latest_version_info",
+			"kubevirt_vmi_guest_device_driver_build_number",
+			"kubevirt_guest_device_driver_minimum_build_number",
 			"kubevirt_guest_device_driver_config_invalid",
 			// guest-agent
 			"kubevirt_vmi_guest_agent_connected",
@@ -144,7 +144,7 @@ var _ = Describe("Default selection", func() {
 
 	It("exposes exactly one recording rule", func() {
 		Expect(selected(recordingRuleIndex(), "")).To(ConsistOf(
-			"vmi:kubevirt_vmi_guest_device_driver_timestamp_seconds:max",
+			"vmi:kubevirt_vmi_guest_device_driver_build_number:max",
 		))
 	})
 

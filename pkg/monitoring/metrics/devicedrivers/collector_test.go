@@ -43,24 +43,29 @@ var _ = Describe("Collector", func() {
 		return samples
 	}
 
-	It("should report one sample per cached entry", func() {
+	It("should report one sample per cached entry, valued at the minimum build number", func() {
 		cache.Store([]DriverEntry{
-			{DeviceID: "1041", DeviceName: "VirtIO network device", GuestOSVersionID: "2022", DriverVersion: "100.95.104.26200"},
-			{DeviceID: "1041", DeviceName: "VirtIO network device", GuestOSVersionID: "2019", DriverVersion: "100.94.104.25200"},
+			{
+				DeviceID: "1041", DeviceName: "VirtIO network device",
+				GuestOSVersionID: "2022", DriverVersion: "100.95.104.26200", BuildNumber: 26200,
+			},
+			{
+				DeviceID: "1041", DeviceName: "VirtIO network device",
+				GuestOSVersionID: "2019", DriverVersion: "100.94.104.25200", BuildNumber: 25200,
+			},
 		})
 
-		results := samplesFor("kubevirt_guest_device_driver_latest_version_info")
+		results := samplesFor("kubevirt_guest_device_driver_minimum_build_number")
 
 		Expect(results).To(HaveLen(2))
-		for _, r := range results {
-			Expect(r.Value).To(Equal(1.0))
-		}
+		Expect(results[0].Value).To(Equal(26200.0))
+		Expect(results[1].Value).To(Equal(25200.0))
 		Expect(results[0].Labels).To(Equal([]string{"1041", "2022", "100.95.104.26200", "VirtIO network device"}))
 		Expect(results[1].Labels).To(Equal([]string{"1041", "2019", "100.94.104.25200", "VirtIO network device"}))
 	})
 
 	It("should report no version samples when the cache is empty", func() {
-		Expect(samplesFor("kubevirt_guest_device_driver_latest_version_info")).To(BeEmpty())
+		Expect(samplesFor("kubevirt_guest_device_driver_minimum_build_number")).To(BeEmpty())
 	})
 
 	It("should report the config as valid when nothing was rejected", func() {
@@ -83,7 +88,7 @@ var _ = Describe("Collector", func() {
 		})
 		cache.MarkConfigInvalid()
 
-		Expect(samplesFor("kubevirt_guest_device_driver_latest_version_info")).To(HaveLen(1))
+		Expect(samplesFor("kubevirt_guest_device_driver_minimum_build_number")).To(HaveLen(1))
 		Expect(samplesFor("kubevirt_guest_device_driver_config_invalid")).To(ConsistOf(
 			HaveField("Value", 1.0),
 		))
@@ -93,9 +98,9 @@ var _ = Describe("Collector", func() {
 		Expect(RegisterCollector(cache, nil)).To(Succeed())
 
 		Expect(operatormetrics.ListMetrics()).To(ContainElement(
-			HaveField("GetOpts().Name", "kubevirt_guest_device_driver_latest_version_info"),
+			HaveField("GetOpts().Name", "kubevirt_guest_device_driver_minimum_build_number"),
 		))
-		Expect(latestVersionInfo.GetType()).To(Equal(operatormetrics.GaugeVecType))
+		Expect(minimumBuildNumber.GetType()).To(Equal(operatormetrics.GaugeVecType))
 	})
 
 	It("should not register the collector when the allowlist excludes the metric", func() {
@@ -106,7 +111,7 @@ var _ = Describe("Collector", func() {
 
 	It("should register the collector when the allowlist includes the metric", func() {
 		Expect(RegisterCollector(cache, map[string]bool{
-			"kubevirt_guest_device_driver_latest_version_info": true,
+			"kubevirt_guest_device_driver_minimum_build_number": true,
 		})).To(Succeed())
 
 		Expect(operatormetrics.ListMetrics()).To(HaveLen(1))
