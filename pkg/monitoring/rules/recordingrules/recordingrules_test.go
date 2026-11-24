@@ -75,6 +75,19 @@ var _ = Describe("Recording Rules", func() {
 		Expect(ruleNames).To(HaveKey("namespace:kubevirt_vm:sum"))
 	})
 
+	It("should include the NetworkAttachmentDefinition recording rule", func() {
+		err := Register(registry, "kubevirt", nil)
+		Expect(err).ToNot(HaveOccurred())
+		rules := registry.ListRecordingRules()
+
+		ruleNames := make(map[string]bool)
+		for _, r := range rules {
+			ruleNames[r.GetOpts().Name] = true
+		}
+
+		Expect(ruleNames).To(HaveKey("cluster:kubevirt_network_attachment_definition_info:sum"))
+	})
+
 	It("should include VMI recording rules", func() {
 		err := Register(registry, "kubevirt", nil)
 		Expect(err).ToNot(HaveOccurred())

@@ -132,6 +132,7 @@ var _ = Describe("Group Selection", Ordered, func() {
 		))
 		Expect(rules.RecordingRuleNames(pr)).To(ConsistOf(
 			"vmi:kubevirt_vmi_guest_device_driver_build_number:max",
+			"cluster:kubevirt_network_attachment_definition_info:sum",
 		))
 	})
 

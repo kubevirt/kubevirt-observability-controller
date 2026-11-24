@@ -39,6 +39,7 @@ func sets(namespace string) [][]operatorrules.RecordingRule {
 		vmRecordingRules,
 		vmiRecordingRules,
 		vmsnapshotRecordingRules,
+		networkAttachmentDefinitionRecordingRules,
 		deprecatedRecordingRules,
 	}
 }
