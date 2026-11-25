@@ -153,6 +153,7 @@ var _ = Describe("Default selection", func() {
 			"OutdatedGuestDeviceDrivers",
 			"KubeVirtVMIOrdinalPodInterfaceName",
 			"VirtualMachineInstanceHasEphemeralHotplugVolume",
+			"VirtualMachineSnapshotFailed",
 		))
 	})
 })
@@ -166,7 +167,7 @@ var _ = Describe("ForFlags", func() {
 
 		Expect(sel.Metrics).To(HaveLen(25))
 		Expect(sel.RecordingRules).To(HaveLen(1))
-		Expect(sel.Alerts).To(HaveLen(3))
+		Expect(sel.Alerts).To(HaveLen(4))
 		Expect(sel.Empty).To(BeEmpty())
 
 		for _, g := range []groups.Name{
@@ -193,14 +194,14 @@ var _ = Describe("ForFlags", func() {
 		Expect(err).To(MatchError(ContainSubstring("no-such-group")))
 	})
 
-	// inventory has metrics but no alerts, and the three flags share one
+	// vmi-network has metrics but no alerts, and the three flags share one
 	// vocabulary, so this is legal and has to be reported rather than looking
 	// like an empty selection.
 	It("reports a group with no items of the flag's type", func() {
-		sel, err := selection.ForFlags(testNamespace, "", "", "inventory", groups.GroupDefaults)
+		sel, err := selection.ForFlags(testNamespace, "", "", "vmi-network", groups.GroupDefaults)
 		Expect(err).ToNot(HaveOccurred())
 		Expect(sel.Alerts).To(BeEmpty())
-		Expect(sel.Empty).To(HaveKeyWithValue(selection.AlertsFlag, ConsistOf("inventory")))
+		Expect(sel.Empty).To(HaveKeyWithValue(selection.AlertsFlag, ConsistOf("vmi-network")))
 	})
 })
 

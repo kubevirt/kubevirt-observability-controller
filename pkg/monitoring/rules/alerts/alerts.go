@@ -75,6 +75,7 @@ func All(namespace string) map[groups.Name][]promv1.Rule {
 		groups.VMIHotplug:      vmiHotplugAlerts,
 		groups.GuestDrivers:    guestDriverAlerts,
 		groups.VMIInterfaces:   vmiInterfaceAlerts,
+		groups.Inventory:       vmSnapshotAlerts,
 	}
 
 	runbookURLTemplate := getRunbookURLTemplate()

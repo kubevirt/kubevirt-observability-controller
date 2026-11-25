@@ -67,6 +67,7 @@ var _ = Describe("PrometheusRule Reconciliation", func() {
 			"OutdatedGuestDeviceDrivers",
 			"KubeVirtVMIOrdinalPodInterfaceName",
 			"VirtualMachineInstanceHasEphemeralHotplugVolume",
+			"VirtualMachineSnapshotFailed",
 		))
 	})
 

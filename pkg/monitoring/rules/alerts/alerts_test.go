@@ -113,6 +113,7 @@ var _ = Describe("Alerts", func() {
 			"KubeVirtVMGuestMemoryAvailableLow":               true,
 			"KubeVirtVMIOrdinalPodInterfaceName":              true,
 			"VMNonRecoverableOSPanic":                         true,
+			"VirtualMachineSnapshotFailed":                    true,
 		}
 
 		var sawComponent, sawVM bool

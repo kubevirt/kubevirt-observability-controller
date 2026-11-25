@@ -411,3 +411,30 @@ var vmiInterfaceAlerts = []promv1.Rule{
 		},
 	},
 }
+
+var vmSnapshotAlerts = []promv1.Rule{
+	{
+		Alert: "VirtualMachineSnapshotFailed",
+		// kubevirt_vmsnapshot_info already carries the real "vm" label (the
+		// snapshot's source VM), so this expression must not use withVMLabel:
+		// that would overwrite "vm" with the snapshot name.
+		//
+		// The max by drops the phase label, so a snapshot that moves from
+		// InProgress to Failed stays one series and the "for" timer is not
+		// reset by the phase transition.
+		Expr: intstr.FromString(
+			"max by (namespace, name, vm) (kubevirt_vmsnapshot_info{ready_to_use='false'}) == 1",
+		),
+		For: ptr.To(promv1.Duration("15m")),
+		Annotations: map[string]string{
+			summaryAnnotationKey: "A VirtualMachineSnapshot has not become ready to use for more than 15 minutes.",
+			descriptionAnnotationKey: "VirtualMachineSnapshot {{ $labels.name }} of VirtualMachine {{ $labels.vm }} " +
+				"in namespace {{ $labels.namespace }} has not been ready to use for more than 15 minutes. " +
+				"The snapshot has failed or is stuck.",
+		},
+		Labels: map[string]string{
+			severityAlertLabelKey:        "warning",
+			operatorHealthImpactLabelKey: "none",
+		},
+	},
+}

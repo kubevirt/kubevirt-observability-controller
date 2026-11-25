@@ -122,7 +122,7 @@ Resolution is logged once on startup:
 
 ```
 groups enabled  guest-agent, guest-os, guest-drivers, vmi-interfaces, vmi-hotplug, inventory
-selection resolved  metrics=23 recordingRules=1 alerts=3
+selection resolved  metrics=23 recordingRules=1 alerts=4
 ```
 
 #### Replacing KubeVirt's monitoring

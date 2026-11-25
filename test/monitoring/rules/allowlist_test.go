@@ -129,6 +129,7 @@ var _ = Describe("Group Selection", Ordered, func() {
 			"OutdatedGuestDeviceDrivers",
 			"KubeVirtVMIOrdinalPodInterfaceName",
 			"VirtualMachineInstanceHasEphemeralHotplugVolume",
+			"VirtualMachineSnapshotFailed",
 		))
 		Expect(rules.RecordingRuleNames(pr)).To(ConsistOf(
 			"vmi:kubevirt_vmi_guest_device_driver_build_number:max",
@@ -159,6 +160,7 @@ var _ = Describe("Group Selection", Ordered, func() {
 			"OutdatedGuestDeviceDrivers",
 			"KubeVirtVMIOrdinalPodInterfaceName",
 			"VirtualMachineInstanceHasEphemeralHotplugVolume",
+			"VirtualMachineSnapshotFailed",
 			"VirtHandlerDaemonSetRolloutFailing",
 			"VirtHandlerRESTErrorsBurst",
 		))
