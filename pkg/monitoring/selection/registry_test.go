@@ -142,9 +142,10 @@ var _ = Describe("Default selection", func() {
 		))
 	})
 
-	It("exposes exactly one recording rule", func() {
+	It("exposes exactly the recording rules KubeVirt does not publish", func() {
 		Expect(selected(recordingRuleIndex(), "")).To(ConsistOf(
 			"vmi:kubevirt_vmi_guest_device_driver_build_number:max",
+			"cluster:kubevirt_network_attachment_definition_info:sum",
 		))
 	})
 
@@ -165,7 +166,7 @@ var _ = Describe("ForFlags", func() {
 		Expect(err).ToNot(HaveOccurred())
 
 		Expect(sel.Metrics).To(HaveLen(25))
-		Expect(sel.RecordingRules).To(HaveLen(1))
+		Expect(sel.RecordingRules).To(HaveLen(2))
 		Expect(sel.Alerts).To(HaveLen(3))
 		Expect(sel.Empty).To(BeEmpty())
 

@@ -92,6 +92,7 @@
 | kubevirt_vmsnapshot_create_date_timestamp_seconds | `inventory` | Metric | Gauge | Virtual Machine Snapshot creation timestamp. |
 | kubevirt_vmsnapshot_info | `inventory` | Metric | Gauge | Information about VirtualMachineSnapshots. |
 | cluster:kubevirt_api_request_deprecated_total:sum | `virt-api` | Recording rule | Counter | The total number of requests to deprecated KubeVirt APIs, by API verb (e.g., LIST, WATCH). |
+| cluster:kubevirt_network_attachment_definition_info:sum | `inventory` | Recording rule | Gauge | Number of VirtualMachine interfaces attached to a NetworkAttachmentDefinition with this configuration. Keeps cni_type, ipam_type, udn_role, ovn_topology, and ovn_persistent_ips. A namespace/name reference is counted on that NetworkAttachmentDefinition. A NetworkAttachmentDefinition with more than one CNI plugin counts those interfaces on each plugin. |
 | cluster:kubevirt_nodes_allocatable:count | `cluster-nodes` | Recording rule | Gauge | The number of allocatable nodes in the cluster. |
 | cluster:kubevirt_nodes_with_kvm:count | `cluster-nodes` | Recording rule | Gauge | The number of nodes in the cluster that have the devices.kubevirt.io/kvm resource available. |
 | cluster:kubevirt_non_schedulable_nodes:sum | `cluster-nodes` | Recording rule | Gauge | The number of non-schedulable nodes in the cluster. |
